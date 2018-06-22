@@ -17,12 +17,19 @@
 #define MSG_GET_DATA                0X11  //控件数据通知
 
 #define PAGE_START 		0x00 // start界面
-#define PAGE_MAIN 		0x01 // main界面
+#define PAGE_MAIN3 		0x01 // main界面
 #define PAGE_PASSWORD 	0x02 // password界面
 #define PAGE_SET1 		0x03 // set1界面
 #define PAGE_SET2 		0x04 // set2界面
 #define PAGE_SET3 		0x05 // set3界面
 #define PAGE_SET4 		0x06 // set4界面
+#define PAGE_MAIN11		0x08 // main界面
+#define PAGE_MAIN12		0x09 // main界面
+#define PAGE_MAIN13		0x0A // main界面
+#define PAGE_MAIN212	0x0B // main界面
+#define PAGE_MAIN213	0x0C // main界面
+#define PAGE_MAIN223	0x0D // main界面
+#define PAGE_BLUETOOTH	0x0E // 蓝牙界面
 
 #define PTR2U16(PTR) ((((uint8_t *)(PTR))[0]<<8)|((uint8_t *)(PTR))[1])  //从缓冲区取16位数据
 #define PTR2U32(PTR) ((((uint8_t *)(PTR))[0]<<24)|(((uint8_t *)(PTR))[1]<<16)|(((uint8_t *)(PTR))[2]<<8)|((uint8_t *)(PTR))[3])  //从缓冲区取32位数据

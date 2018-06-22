@@ -30,6 +30,7 @@ extern signed long currentTime;
 extern SAVEDATA saveData[];
 extern uint8_t inputPassword[];
 extern uint8_t currentCHN;
+extern uint8_t getUIFlag;
 CTRL_MSG updateUICMD;
 
 /* 颜色代码 */
@@ -222,183 +223,199 @@ void ProcessUIMessage(PCTRL_MSG msg, uint16_t size) {
  *  \param screen_id 当前画面ID
  */
 void NotifyScreen(uint16_t screen_id) {
-	lastPage = currentPage;
-	currentPage = screen_id;
-	if (currentPage == PAGE_START) {
-		if (timeStamp == 999) {
-			uint8_t temp[11];
-			/* 播放开机音频 */
-			Line_1A_WTN5(0xEF - 5); //音量
-			HAL_Delay(50);
-			Line_1A_WTN5(0xF3); //断续播放
-			HAL_Delay(50);
-			Line_1A_WTN5(0x01); //播放第零语音
-			HAL_Delay(50);
-			//启动开机动画
-			//EE B1 20 00 00 00 01 FF FC FF FF
+	if (getUIFlag == 2) {
+		if (currentPage != screen_id) {
+			eepromReadSetting();
+			loadMainPage();
+		}
+		getUIFlag = 0;
+	} else {
+		getUIFlag = 0;
+		lastPage = currentPage;
+		currentPage = screen_id;
+		if (currentPage == PAGE_START) {
+			if (timeStamp == 999) {
+				uint8_t temp[11];
+				/* 播放开机音频 */
+				Line_1A_WTN5(0xEF - 5); //音量
+				HAL_Delay(50);
+				Line_1A_WTN5(0xF3); //断续播放
+				HAL_Delay(50);
+				Line_1A_WTN5(0x01); //播放第零语音
+				HAL_Delay(50);
+				//启动开机动画
+				//EE B1 20 00 00 00 01 FF FC FF FF
+				temp[0] = 0xEE; //帧头
+				temp[1] = 0xB1;	//命令类型(UPDATE_CONTROL)
+				temp[2] = 0x20;
+				temp[3] = 0x00;
+				temp[4] = 0x00;
+				temp[5] = 0x00;
+				temp[6] = 0x01;
+				temp[7] = 0xFF;	//帧尾
+				temp[8] = 0xFC;
+				temp[9] = 0xFF;
+				temp[10] = 0xFF;
+				HAL_UART_Transmit(&huart2, temp, 11, 0xFFFF);
+				//记录定时器时间，8s开机
+				timeStamp = currentTime;
+			}
+		}
+		if (currentPage == PAGE_PASSWORD) {
+			uint8_t temp[15];
+			uint8_t i;
+			//清除密码错误提示
+			//EE B1 10 00 02 00 04 20 FF FC FF FF
+			uint8_t temp0[12] = { 0xEE, 0xB1, 0x10, 0x00, 0x02, 0x00, 0x04,
+					0x20, 0xFF, 0xFC, 0xFF, 0xFF };
+			HAL_UART_Transmit(&huart2, temp0, 12, 0xFFFF);
+			//更新初始显示密码
+			//EE B1 10 00 02 00 01 78 78 78 78 FF FC FF FF
 			temp[0] = 0xEE; //帧头
 			temp[1] = 0xB1;	//命令类型(UPDATE_CONTROL)
-			temp[2] = 0x20;
+			temp[2] = 0x10;
 			temp[3] = 0x00;
-			temp[4] = 0x00;
+			temp[4] = 0x02;
 			temp[5] = 0x00;
 			temp[6] = 0x01;
-			temp[7] = 0xFF;	//帧尾
-			temp[8] = 0xFC;
+			temp[7] = 0x78;
+			temp[8] = 0x78;
+			temp[9] = 0x78;
+			temp[10] = 0x78;
+			temp[11] = 0xFF;	//帧尾
+			temp[12] = 0xFC;
+			temp[13] = 0xFF;
+			temp[14] = 0xFF;
+			HAL_UART_Transmit(&huart2, temp, 15, 0xFFFF);
+			for (i = 0; i < 4; i++) {
+				inputPassword[i] = 0x78;
+			}
+		}
+
+		if (currentPage == PAGE_SET1) {
+			//获取 set1 当前通道号
+			//EE B1 11 00 02 00 01 FF FC FF FF
+			uint8_t temp4[11] = { 0xEE, 0xB1, 0x11, 0x00, 0x03, 0x00, 0x01,
+					0xFF, 0xFC, 0xFF, 0xFF };
+			/* 获取通道号以更新界面 */
+			HAL_UART_Transmit(&huart2, temp4, 11, 0xFFFF);
+		}
+
+		if (currentPage == PAGE_SET2) {
+			uint8_t temp[100];
+			uint8_t i = 0;
+			//EE B1 12 00 04
+			//00 01 00 01 31
+			//00 03 00 01 33
+			//00 06 00 01 36
+			//FF FC FF FF
+			temp[0] = 0xEE;
+			temp[1] = 0xB1;
+			temp[2] = 0x12; 			//CtrlMsgType-指示消息的类型
+			temp[3] = 0x00;  			//产生消息的画面ID
+			temp[4] = 0x04;
+
+			//加载modbus地址
+			temp[5] = 0x00;
+			temp[6] = 0x01;
+			temp[7] = 0x00;
+			temp[8] = 0x03;
+
+			temp[9] = (uint8_t) (saveData[0].modbusAddr / 100);
+			temp[10] = saveData[0].modbusAddr - temp[9] * 100;
+			temp[10] = (uint8_t) (temp[10] / 10);
+			temp[11] = (uint8_t) (saveData[0].modbusAddr - temp[9] * 100
+					- temp[10] * 10) + '0';
+			temp[9] += '0';
+			temp[10] += '0';
+
+			//加载IP地址
+			temp[12] = 0x00;
+			temp[13] = 0x03;
+			temp[14] = 0x00;
+			temp[15] = 0x0F;
+
+			temp[16] = (uint8_t) (saveData[0].IP[0] / 100);
+			temp[17] = saveData[0].IP[0] - temp[16] * 100;
+			temp[17] = (uint8_t) (temp[17] / 10);
+			temp[18] = (uint8_t) (saveData[0].IP[0] - temp[16] * 100
+					- temp[17] * 10) + '0';
+			temp[16] += '0';
+			temp[17] += '0';
+			temp[19] = '.';
+
+			temp[20] = (uint8_t) (saveData[0].IP[1] / 100);
+			temp[21] = saveData[0].IP[1] - temp[20] * 100;
+			temp[21] = (uint8_t) (temp[21] / 10);
+			temp[22] = (uint8_t) (saveData[0].IP[1] - temp[20] * 100
+					- temp[21] * 10) + '0';
+			temp[20] += '0';
+			temp[21] += '0';
+			temp[23] = '.';
+
+			temp[24] = (uint8_t) (saveData[0].IP[2] / 100);
+			temp[25] = saveData[0].IP[2] - temp[24] * 100;
+			temp[25] = (uint8_t) (temp[25] / 10);
+			temp[26] = (uint8_t) (saveData[0].IP[2] - temp[24] * 100
+					- temp[25] * 10) + '0';
+			temp[24] += '0';
+			temp[25] += '0';
+			temp[27] = '.';
+
+			temp[28] = (uint8_t) (saveData[0].IP[3] / 100);
+			temp[29] = saveData[0].IP[3] - temp[28] * 100;
+			temp[29] = (uint8_t) (temp[29] / 10);
+			temp[30] = (uint8_t) (saveData[0].IP[3] - temp[28] * 100
+					- temp[29] * 10) + '0';
+			temp[28] += '0';
+			temp[29] += '0';
+
+			//加载密码
+			temp[31] = 0x00;
+			temp[32] = 0x06;
+			temp[33] = 0x00;
+			for (i = 0; i <= saveData[0].userPassword[0]; i++) {
+				temp[i + 34] = saveData[0].userPassword[i];
+			}
+
+			temp[i + 34] = 0xFF;   			//帧尾
+			temp[i + 35] = 0xFC;
+			temp[i + 36] = 0xFF;
+			temp[i + 37] = 0xFF;
+			HAL_UART_Transmit(&huart2, temp, i + 38, 0xFFFF);
+			//加载波特率
+			//EE B1 10 00 04 00 02 00 FF FC FF FF
+			temp[3] = 0x10;
+			temp[4] = 0x00;
+			temp[5] = 0x04;
+			temp[6] = 0x00;
+			temp[7] = 0x02;
+			temp[8] = saveData[0].baudrateIndex;
 			temp[9] = 0xFF;
-			temp[10] = 0xFF;
-			HAL_UART_Transmit(&huart2, temp, 11, 0xFFFF);
-			//记录定时器时间，8s开机
-			timeStamp = currentTime;
-		}
-	}
-	if (currentPage == PAGE_PASSWORD) {
-		uint8_t temp[15];
-		uint8_t i;
-		//清除密码错误提示
-		//EE B1 10 00 02 00 04 20 FF FC FF FF
-		uint8_t temp0[12] = { 0xEE, 0xB1, 0x10, 0x00, 0x02, 0x00, 0x04, 0x20,
-				0xFF, 0xFC, 0xFF, 0xFF };
-		HAL_UART_Transmit(&huart2, temp0, 12, 0xFFFF);
-		//更新初始显示密码
-		//EE B1 10 00 02 00 01 78 78 78 78 FF FC FF FF
-		temp[0] = 0xEE; //帧头
-		temp[1] = 0xB1;	//命令类型(UPDATE_CONTROL)
-		temp[2] = 0x10;
-		temp[3] = 0x00;
-		temp[4] = 0x02;
-		temp[5] = 0x00;
-		temp[6] = 0x01;
-		temp[7] = 0x78;
-		temp[8] = 0x78;
-		temp[9] = 0x78;
-		temp[10] = 0x78;
-		temp[11] = 0xFF;	//帧尾
-		temp[12] = 0xFC;
-		temp[13] = 0xFF;
-		temp[14] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 15, 0xFFFF);
-		for (i = 0; i < 4; i++) {
-			inputPassword[i] = 0x78;
-		}
-	}
-
-	if (currentPage == PAGE_SET1) {
-		//获取 set1 当前通道号
-		//EE B1 11 00 02 00 01 FF FC FF FF
-		uint8_t temp4[11] = { 0xEE, 0xB1, 0x11, 0x00, 0x03, 0x00, 0x01, 0xFF,
-				0xFC, 0xFF, 0xFF };
-		/* 获取通道号以更新界面 */
-		HAL_UART_Transmit(&huart2, temp4, 11, 0xFFFF);
-	}
-
-	if (currentPage == PAGE_SET2) {
-		uint8_t temp[100];
-		uint8_t i = 0;
-		//EE B1 12 00 04
-		//00 01 00 01 31
-		//00 03 00 01 33
-		//00 06 00 01 36
-		//FF FC FF FF
-		temp[0] = 0xEE;
-		temp[1] = 0xB1;
-		temp[2] = 0x12; 			//CtrlMsgType-指示消息的类型
-		temp[3] = 0x00;  			//产生消息的画面ID
-		temp[4] = 0x04;
-
-		//加载modbus地址
-		temp[5] = 0x00;
-		temp[6] = 0x01;
-		temp[7] = 0x00;
-		temp[8] = 0x03;
-
-		temp[9] = (uint8_t) (saveData[0].modbusAddr / 100);
-		temp[10] = saveData[0].modbusAddr - temp[9] * 100;
-		temp[10] = (uint8_t) (temp[10] / 10);
-		temp[11] = (uint8_t) (saveData[0].modbusAddr - temp[9] * 100
-				- temp[10] * 10) + '0';
-		temp[9] += '0';
-		temp[10] += '0';
-
-		//加载IP地址
-		temp[12] = 0x00;
-		temp[13] = 0x03;
-		temp[14] = 0x00;
-		temp[15] = 0x0F;
-
-		temp[16] = (uint8_t) (saveData[0].IP[0] / 100);
-		temp[17] = saveData[0].IP[0] - temp[16] * 100;
-		temp[17] = (uint8_t) (temp[17] / 10);
-		temp[18] =
-				(uint8_t) (saveData[0].IP[0] - temp[16] * 100 - temp[17] * 10)
-						+ '0';
-		temp[16] += '0';
-		temp[17] += '0';
-		temp[19] = '.';
-
-		temp[20] = (uint8_t) (saveData[0].IP[1] / 100);
-		temp[21] = saveData[0].IP[1] - temp[20] * 100;
-		temp[21] = (uint8_t) (temp[21] / 10);
-		temp[22] =
-				(uint8_t) (saveData[0].IP[1] - temp[20] * 100 - temp[21] * 10)
-						+ '0';
-		temp[20] += '0';
-		temp[21] += '0';
-		temp[23] = '.';
-
-		temp[24] = (uint8_t) (saveData[0].IP[2] / 100);
-		temp[25] = saveData[0].IP[2] - temp[24] * 100;
-		temp[25] = (uint8_t) (temp[25] / 10);
-		temp[26] =
-				(uint8_t) (saveData[0].IP[2] - temp[24] * 100 - temp[25] * 10)
-						+ '0';
-		temp[24] += '0';
-		temp[25] += '0';
-		temp[27] = '.';
-
-		temp[28] = (uint8_t) (saveData[0].IP[3] / 100);
-		temp[29] = saveData[0].IP[3] - temp[28] * 100;
-		temp[29] = (uint8_t) (temp[29] / 10);
-		temp[30] =
-				(uint8_t) (saveData[0].IP[3] - temp[28] * 100 - temp[29] * 10)
-						+ '0';
-		temp[28] += '0';
-		temp[29] += '0';
-
-		//加载密码
-		temp[31] = 0x00;
-		temp[32] = 0x06;
-		temp[33] = 0x00;
-		for (i = 0; i <= saveData[0].userPassword[0]; i++) {
-			temp[i + 34] = saveData[0].userPassword[i];
+			temp[10] = 0xFC;
+			temp[11] = 0xFF;
+			temp[12] = 0xFF;
+			HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
+			//加载模式
+			temp[7] = 0x04;
+			temp[8] = saveData[0].modeIndex;
+			HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
+			//加载音量
+			temp[7] = 0x05;
+			temp[8] = (uint8_t) (saveData[0].volume / 10);
+			HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
 		}
 
-		temp[i + 34] = 0xFF;   			//帧尾
-		temp[i + 35] = 0xFC;
-		temp[i + 36] = 0xFF;
-		temp[i + 37] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, i + 38, 0xFFFF);
-		//加载波特率
-		//EE B1 10 00 04 00 02 00 FF FC FF FF
-		temp[3] = 0x10;
-		temp[4] = 0x00;
-		temp[5] = 0x04;
-		temp[6] = 0x00;
-		temp[7] = 0x02;
-		temp[8] = saveData[0].baudrateIndex;
-		temp[9] = 0xFF;
-		temp[10] = 0xFC;
-		temp[11] = 0xFF;
-		temp[12] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
-		//加载模式
-		temp[7] = 0x04;
-		temp[8] = saveData[0].modeIndex;
-		HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
-		//加载音量
-		temp[7] = 0x05;
-		temp[8] = (uint8_t) (saveData[0].volume / 10);
-		HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
+		if (currentPage == PAGE_BLUETOOTH) {
+			//获取蓝牙MAC地址
+			//TODO
+			//显示蓝牙MAC地址和二维码
+			//EE B1 12 00 01 00 03 00 0C 30 30 31 37 45 41 30 39 32 33 41 45 00 01 00 0C 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
+			uint8_t temp4[11] = { 0xEE, 0xB1, 0x11, 0x00, 0x03, 0x00, 0x01,
+					0xFF, 0xFC, 0xFF, 0xFF };
+			/* 获取通道号以更新界面 */
+			HAL_UART_Transmit(&huart2, temp4, 11, 0xFFFF);
+		}
 	}
 }
 
@@ -419,6 +436,7 @@ void NotifyTouchXY(uint8_t press, uint16_t x, uint16_t y) {
  *  \param state 按钮状态：0弹起，1按下
  */
 void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
+	getUIFlag = 0;
 	/* 密码界面确认按钮 */
 	if (currentPage == PAGE_PASSWORD && control_id == 2) {
 		uint8_t temp[50];
@@ -653,53 +671,69 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 	if (currentPage == PAGE_SET1 && control_id == 9) {
 		/* 复原参数 */
 		eepromReadSetting();
-		//跳转至主屏幕
+		//恢复至对应主屏幕
 		//EE B1 00 00 01 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
 				0xFF };
+		temp5[4] = lastPage;
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
+		currentPage = lastPage;
+		lastPage = PAGE_SET1;
 	}/* END set1取消按钮 */
 
 	/* set2取消按钮 */
 	if (currentPage == PAGE_SET2 && control_id == 9) {
 		/* 复原参数 */
 		eepromReadSetting();
-		//跳转至主屏幕
+		//恢复至对应主屏幕
 		//EE B1 00 00 01 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
 				0xFF };
+		temp5[4] = lastPage;
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
+		currentPage = lastPage;
+		lastPage = PAGE_SET2;
 	}/* END set2取消按钮 */
 
 	/* set3取消按钮 */
 	if (currentPage == PAGE_SET3 && control_id == 9) {
-		//跳转至主屏幕
+		//恢复至对应主屏幕
 		//EE B1 00 00 01 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
 				0xFF };
+		temp5[4] = lastPage;
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
+		currentPage = lastPage;
+		lastPage = PAGE_SET3;
 		/* 复原参数 */
 		eepromReadSetting();
 	}/* END set3取消按钮 */
 
 	/* set4取消按钮 */
 	if (currentPage == PAGE_SET4 && control_id == 9) {
-		//跳转至主屏幕
+		//恢复至对应主屏幕
 		//EE B1 00 00 01 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
 				0xFF };
+		temp5[4] = lastPage;
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
+		currentPage = lastPage;
+		lastPage = PAGE_SET4;
 		/* 复原参数 */
 		eepromReadSetting();
 	}/* END set4取消按钮 */
+
+	/* Bluetooth取消按钮 */
+	if (currentPage == PAGE_BLUETOOTH && control_id == 4) {
+		//恢复至对应主屏幕
+		//EE B1 00 00 01 FF FC FF FF
+		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
+				0xFF };
+		temp5[4] = lastPage;
+		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		currentPage = lastPage;
+		lastPage = PAGE_BLUETOOTH;
+	}/* END Bluetooth取消按钮 */
 
 	/* set1 & set2 确认按钮 */
 	if ((currentPage == PAGE_SET1 || currentPage == PAGE_SET2)
@@ -709,17 +743,11 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
 		/* 保存参数到 eeprom */
 		eepromWriteSetting();
 		eepromReadSetting();
 		/* 根据设置加载主屏幕 */
 		loadMainPage();
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		temp5[4] = 0x01;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
 	}/* END set1 & set2 确认按钮 */
 	/* set3 确认按钮 */
 	if (currentPage == PAGE_SET3 && control_id == 8) {
@@ -728,17 +756,11 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
 		/* 保存参数到 eeprom */
 		eepromWriteSetting();
 		eepromReadSetting();
 		/* 根据设置加载主屏幕 */
 		loadMainPage();
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		temp5[4] = 0x01;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
 	}/* END set3取消按钮 */
 	/* set4 确认按钮 */
 	if (currentPage == PAGE_SET4 && control_id == 8) {
@@ -747,17 +769,11 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
 		/* 保存参数到 eeprom */
 		eepromWriteSetting();
 		eepromReadSetting();
 		/* 根据设置加载主屏幕 */
 		loadMainPage();
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		temp5[4] = 0x01;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
 	}/* END set4 确认按钮 */
 }
 
@@ -769,6 +785,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
  *  \param str 文本控件内容
  */
 void NotifyText(uint16_t screen_id, uint16_t control_id, uint8_t *str) {
+	getUIFlag = 0;
 	if (currentPage == PAGE_PASSWORD && control_id == 1) {
 		uint8_t i, j;
 		j = 60;
@@ -941,6 +958,7 @@ void NotifyMeter(uint16_t screen_id, uint16_t control_id, uint32_t value) {
  */
 void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 		uint8_t state) {
+	getUIFlag = 0;
 	/* set2 恢复出厂设置 - 确认按钮 */
 	if (currentPage == PAGE_SET2 && control_id == 14 && state == 0) {
 		//跳转至load屏幕
@@ -948,17 +966,12 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
+
 		/* 保存参数到 eeprom */
 		factorySetting(2);
 		eepromWriteSetting();
 		eepromReadSetting();
 		loadMainPage();
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		temp5[4] = 0x01;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
 	}/* END set2 恢复出厂设置 - 确认按钮 */
 	/* set3 恢复出厂设置 - 确认按钮 */
 	if (currentPage == PAGE_SET3 && control_id == 14 && state == 0) {
@@ -967,17 +980,11 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
 		/* 保存参数到 eeprom */
 		factorySetting(1);
 		eepromWriteSetting();
 		eepromReadSetting();
 		loadMainPage();
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		temp5[4] = 0x01;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
 	}/* END set3 恢复出厂设置 - 确认按钮 */
 
 	/* set4 恢复出厂设置 - 确认按钮 */
@@ -987,17 +994,11 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
 		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN;
 		/* 保存参数到 eeprom */
 		factorySetting(0);
 		eepromWriteSetting();
 		eepromReadSetting();
 		loadMainPage();
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		temp5[4] = 0x01;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
 	}/* END set4 恢复出厂设置 - 确认按钮 */
 }
 
@@ -1009,16 +1010,17 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
  *  \param item 当前选项
  */
 void NotifySelector(uint16_t screen_id, uint16_t control_id, uint8_t item) {
+	getUIFlag = 0;
 	/* 名称 || 量程 */
 	uint8_t temp1[12] = { 0xEE, 0xB1, 0x10, 0x00, 0x03, 0x00, 0x02, 0x00, 0xFF,
 			0xFC, 0xFF, 0xFF };
 	/* 上下限 && 压力修正系数 */
-//EE B1 12 00 03
-//00 04 00 04 31 2E 31 31
-//00 05 00 04 31 2E 31 31
-//00 06 00 04 31 2E 31 31
-//00 07 00 04 31 2E 31 31
-//FF FC FF FF
+	//EE B1 12 00 03
+	//00 04 00 04 31 2E 31 31
+	//00 05 00 04 31 2E 31 31
+	//00 06 00 04 31 2E 31 31
+	//00 07 00 04 31 2E 31 31
+	//FF FC FF FF
 	uint8_t temp2[45] = { 0xEE, 0xB1, 0x12, 0x00, 0x03, 0x00, 0x04, 0x00, 0x05,
 			0x2D, 0x31, 0x2E, 0x31, 0x31, 0x00, 0x05, 0x00, 0x05, 0x2D, 0x31,
 			0x2E, 0x31, 0x31, 0x00, 0x06, 0x00, 0x05, 0x2D, 0x31, 0x2E, 0x31,
