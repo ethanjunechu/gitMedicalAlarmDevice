@@ -31,6 +31,10 @@ extern SAVEDATA saveData[];
 extern uint8_t inputPassword[];
 extern uint8_t currentCHN;
 extern uint8_t getUIFlag;
+extern uint8_t volumePicCMD[];
+extern uint8_t muteFlag;
+extern uint8_t alarmFlag;
+extern uint8_t testFlag;
 CTRL_MSG updateUICMD;
 
 /* 颜色代码 */
@@ -775,6 +779,31 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		/* 根据设置加载主屏幕 */
 		loadMainPage();
 	}/* END set4 确认按钮 */
+	/* 静音按钮 */
+	if (control_id == 22) {
+		//修改音量图标
+		volumePicCMD[4] = currentPage;
+		if (muteFlag == 0) {
+			volumePicCMD[7] = 0 + alarmFlag;
+			muteFlag = 1;
+		} else {
+			volumePicCMD[7] = (uint8_t) (saveData[0].volume / 10);
+			if (volumePicCMD[7] <= 4) {
+				volumePicCMD[7] = 1 + alarmFlag;
+			} else if (volumePicCMD[7] > 4 && volumePicCMD[7] <= 7) {
+				volumePicCMD[7] = 2 + alarmFlag;
+			} else if (volumePicCMD[7] > 7) {
+				volumePicCMD[7] = 3 + alarmFlag;
+			}
+			muteFlag = 0;
+		}
+		//修改音量图标
+		HAL_UART_Transmit(&huart2, volumePicCMD, 12, 0xFFFF);
+	}/* END 静音按钮 */
+	/* 测试按钮 */
+	if (control_id == 24) {
+		testFlag = 1;
+	}/* END 测试按钮 */
 }
 
 /*!

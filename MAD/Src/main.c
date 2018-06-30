@@ -587,7 +587,8 @@ void application(void) {
 			if (timeStamp > 500) {
 				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
 				CMD_MAX_SIZE) != HAL_OK) {
-					Error_Handler();
+					//TODO加入蓝牙芯片后开启
+//					Error_Handler();
 				}
 				/* 开启串口空闲中断 */
 				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
@@ -730,7 +731,38 @@ void loadMainPage(void) {
 	temp[1] = 0xB1;
 	temp[2] = 0x12;
 	temp[3] = 0x00;
-	temp[4] = 0x01;
+
+	//跳转主画面3
+	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
+			&& saveData[2].nameIndex != 0) {
+		temp[4] = 0x01;
+	}
+	//跳转主画面1-1
+	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
+			&& saveData[2].nameIndex == 0) {
+		temp[4] = PAGE_MAIN11;
+	}
+	//跳转主画面1-2
+	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
+			&& saveData[2].nameIndex == 0) {
+		temp[4] = PAGE_MAIN12;
+	}
+	//跳转主画面1-3
+	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex == 0
+			&& saveData[2].nameIndex != 0) {
+		temp[4] = PAGE_MAIN213;
+	}
+	//跳转主画面2-12
+	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
+			&& saveData[2].nameIndex == 0) {
+		temp[4] = PAGE_MAIN212;
+	}
+	//跳转主画面2-23
+	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
+			&& saveData[2].nameIndex != 0) {
+		temp[4] = PAGE_MAIN223;
+	}
+
 	/* 通道 1 名称 */
 	temp[5] = 0x00;
 	temp[6] = 0x0F;
@@ -1530,7 +1562,18 @@ void updateUI(void) {
 			float_ADCValue[i] = 0;
 		}
 	}
-
+	if (float_ADCValue[0] < 0) {
+		multiUICMD[6] = 6;
+	} else
+		multiUICMD[6] = 26;
+	if (float_ADCValue[1] < 0) {
+		multiUICMD[15] = 9;
+	} else
+		multiUICMD[15] = 27;
+	if (float_ADCValue[2] < 0) {
+		multiUICMD[24] = 12;
+	} else
+		multiUICMD[24] = 28;
 	FloatToStr5(float_ADCValue[0], tempAdcASCii, 5);
 	for (i = 0; i < 5; i++) {
 		multiUICMD[i + 9] = tempAdcASCii[i];
@@ -2044,6 +2087,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN) {
 		if (HAL_GPIO_ReadPin(BUTTON_CLEAR_GPIO,
 		BUTTON_CLEAR_GPIO_PIN) == BUTTON_CLEAR_DOWN_LEVEL) {
 			//修改音量图标
+			volumePicCMD[4] = currentPage;
 			if (muteFlag == 0) {
 				volumePicCMD[7] = 0 + alarmFlag;
 				muteFlag = 1;
