@@ -1587,6 +1587,7 @@ void updateUI(void) {
 		multiUICMD[i + 27] = tempAdcASCii[i];
 	}
 	/* 通道 1 */
+	//testGitHubname
 	//正常
 	if ((float_ADCValue[0] > saveData[0].lower_limit)
 			&& (float_ADCValue[0] < saveData[0].upper_limit)
