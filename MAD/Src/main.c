@@ -105,9 +105,9 @@ uint8_t RS232_recvLength = 0;
 // 00 0B 00 04 B3 AC D1 B9	  状态2
 // 00 0E 00 04 C7 B7 D1 B9	  状态3
 // FF FC FF FF
-uint8_t multiUICMD[60] = { 0xEE, 0xB1, 0x12, 0x00, 0x01, 0x00, 0x06, 0x00, 0x05,
-		0x2D, 0x31, 0x2E, 0x32, 0x37, 0x00, 0x09, 0x00, 0x05, 0x20, 0x31, 0x2E,
-		0x32, 0x37, 0x00, 0x0C, 0x00, 0x05, 0x20, 0x31, 0x2E, 0x32, 0x37, 0x00,
+uint8_t multiUICMD[60] = { 0xEE, 0xB1, 0x12, 0x00, 0x01, 0x00, 26, 0x00, 0x05,
+		0x2D, 0x31, 0x2E, 0x32, 0x37, 0x00, 27, 0x00, 0x05, 0x20, 0x31, 0x2E,
+		0x32, 0x37, 0x00, 28, 0x00, 0x05, 0x20, 0x31, 0x2E, 0x32, 0x37, 0x00,
 		0x08, 0x00, 0x04, 0xD5, 0xFD, 0xB3, 0xA3, 0x00, 0x0B, 0x00, 0x04, 0xB3,
 		0xAC, 0xD1, 0xB9, 0x00, 0x0E, 0x00, 0x04, 0xC7, 0xB7, 0xD1, 0xB9, 0xFF,
 		0xFC, 0xFF, 0xFF };
@@ -121,10 +121,10 @@ uint8_t statusColorCMD[3][13] = { { 0xEE, 0xB1, 0x19, 0x00, 0x01, 0x00, 0x08,
 		0x07, 0xE0, 0xFF, 0xFC, 0xFF, 0xFF }, { 0xEE, 0xB1, 0x19, 0x00, 0x01,
 		0x00, 0x0B, 0x07, 0xE0, 0xFF, 0xFC, 0xFF, 0xFF }, { 0xEE, 0xB1, 0x19,
 		0x00, 0x01, 0x00, 0x0E, 0x07, 0xE0, 0xFF, 0xFC, 0xFF, 0xFF } };
-uint8_t numColorCMD[3][13] = { { 0xEE, 0xB1, 0x19, 0x00, 0x01, 0x00, 0x06, 0x07,
+uint8_t numColorCMD[3][13] = { { 0xEE, 0xB1, 0x19, 0x00, 0x01, 0x00, 26, 0x07,
 		0xE0, 0xFF, 0xFC, 0xFF, 0xFF }, { 0xEE, 0xB1, 0x19, 0x00, 0x01, 0x00,
-		0x09, 0x07, 0xE0, 0xFF, 0xFC, 0xFF, 0xFF }, { 0xEE, 0xB1, 0x19, 0x00,
-		0x01, 0x00, 0x0C, 0x07, 0xE0, 0xFF, 0xFC, 0xFF, 0xFF } };
+		27, 0x07, 0xE0, 0xFF, 0xFC, 0xFF, 0xFF }, { 0xEE, 0xB1, 0x19, 0x00,
+		0x01, 0x00, 28, 0x07, 0xE0, 0xFF, 0xFC, 0xFF, 0xFF } };
 //能量柱动画帧选择显示命令
 //EE B1 23 00 01 00 02 00 FF FC FF FF
 uint8_t percentPicCMD[3][12] = { { 0xEE, 0xB1, 0x23, 0x00, 0x01, 0x00, 0x02,
@@ -538,67 +538,66 @@ void application(void) {
 	__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
 
 	/* 设置蓝牙 */
-	while (1) {
-		if (bluetoothFlag == 1) {
-			if (BLUETOOTH_RX_BUF[0] == 'O' && BLUETOOTH_RX_BUF[1] == 'K'
-					&& BLUETOOTH_RX_BUF[2] == '+' && BLUETOOTH_RX_BUF[3] == 'L'
-					&& BLUETOOTH_RX_BUF[4] == 'A' && BLUETOOTH_RX_BUF[5] == 'D'
-					&& BLUETOOTH_RX_BUF[6] == 'D'
-					&& BLUETOOTH_RX_BUF[7] == ':') {
-				uint8_t i = 0;
-				/* 设置蓝牙NAME */
-				//蓝牙界面文本
-				//EE B1 10 00 0E 00 03 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
-				uint8_t temp[23] = { 0xEE, 0xB1, 0x10, 0x00, 0x0E, 0x00, 0x03,
-						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-						0x00, 0x00, 0x00, 0xFF, 0xFC, 0xFF, 0xFF };
-				//蓝牙界面二维码
-				//EE B1 10 00 0E 00 01 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
-				uint8_t setBluetoothName[21] = { 'A', 'T', '+', 'N', 'A', 'M',
-						'E', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-						0x00, 0x00, 0x00, 0x00, 0x0D, 0x0A };
-				for (; i < 11; i++) {
-					setBluetoothName[i + 6] = BLUETOOTH_RX_BUF[i + 8];
-					temp[i + 7] = BLUETOOTH_RX_BUF[i + 8];
-				}
-				HAL_UART_Transmit(&huart3, setBluetoothName, 21, 0xFFFF);
-				//设置蓝牙界面文本
-				HAL_UART_Transmit(&huart3, temp, 23, 0xFFFF);
-				//设置蓝牙界面二维码
-				temp[6] = 0x01;
-				HAL_UART_Transmit(&huart3, temp, 23, 0xFFFF);
-				bluetoothFlag = 0;
-				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
-				CMD_MAX_SIZE) != HAL_OK) {
-					Error_Handler();
-				}
-				/* 开启串口空闲中断 */
-				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-				break;
-			} else {
-				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
-				CMD_MAX_SIZE) != HAL_OK) {
-					Error_Handler();
-				}
-				/* 开启串口空闲中断 */
-				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-			}
-		} else {
-			if (timeStamp > 500) {
-				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
-				CMD_MAX_SIZE) != HAL_OK) {
-					//TODO加入蓝牙芯片后开启
+//	while (1) {
+//		if (bluetoothFlag == 1) {
+//			if (BLUETOOTH_RX_BUF[0] == 'O' && BLUETOOTH_RX_BUF[1] == 'K'
+//					&& BLUETOOTH_RX_BUF[2] == '+' && BLUETOOTH_RX_BUF[3] == 'L'
+//					&& BLUETOOTH_RX_BUF[4] == 'A' && BLUETOOTH_RX_BUF[5] == 'D'
+//					&& BLUETOOTH_RX_BUF[6] == 'D'
+//					&& BLUETOOTH_RX_BUF[7] == ':') {
+//				uint8_t i = 0;
+//				/* 设置蓝牙NAME */
+//				//蓝牙界面文本
+//				//EE B1 10 00 0E 00 03 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
+//				uint8_t temp[23] = { 0xEE, 0xB1, 0x10, 0x00, 0x0E, 0x00, 0x03,
+//						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//						0x00, 0x00, 0x00, 0xFF, 0xFC, 0xFF, 0xFF };
+//				//蓝牙界面二维码
+//				//EE B1 10 00 0E 00 01 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
+//				uint8_t setBluetoothName[21] = { 'A', 'T', '+', 'N', 'A', 'M',
+//						'E', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+//						0x00, 0x00, 0x00, 0x00, 0x0D, 0x0A };
+//				for (; i < 11; i++) {
+//					setBluetoothName[i + 6] = BLUETOOTH_RX_BUF[i + 8];
+//					temp[i + 7] = BLUETOOTH_RX_BUF[i + 8];
+//				}
+//				HAL_UART_Transmit(&huart3, setBluetoothName, 21, 0xFFFF);
+//				//设置蓝牙界面文本
+//				HAL_UART_Transmit(&huart3, temp, 23, 0xFFFF);
+//				//设置蓝牙界面二维码
+//				temp[6] = 0x01;
+//				HAL_UART_Transmit(&huart3, temp, 23, 0xFFFF);
+//				bluetoothFlag = 0;
+//				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
+//				CMD_MAX_SIZE) != HAL_OK) {
 //					Error_Handler();
-				}
-				/* 开启串口空闲中断 */
-				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-				break;
-			}
-			setBluetooth();
-			HAL_Delay(1000);
-		}
-	}
-
+//				}
+//				/* 开启串口空闲中断 */
+//				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
+//				break;
+//			} else {
+//				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
+//				CMD_MAX_SIZE) != HAL_OK) {
+//					Error_Handler();
+//				}
+//				/* 开启串口空闲中断 */
+//				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
+//			}
+//		} else {
+//			if (timeStamp > 500) {
+//				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
+//				CMD_MAX_SIZE) != HAL_OK) {
+//					//TODO加入蓝牙芯片后开启
+////					Error_Handler();
+//				}
+//				/* 开启串口空闲中断 */
+//				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
+//				break;
+//			}
+//			setBluetooth();
+//			HAL_Delay(1000);
+//		}
+//	}/* End 设置蓝牙 */
 	/* 启动检查画面 */
 	uint8_t temp[7];
 	temp[0] = 0xEE;  			//帧头
@@ -623,7 +622,8 @@ void application(void) {
 			/* 开启串口2空闲中断 */
 			__HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
 		}
-		if (currentPage == PAGE_MAIN3) {
+		if (currentPage == PAGE_MAIN3
+				|| (PAGE_MAIN11 <= currentPage && currentPage <= PAGE_MAIN223)) {
 			/* 自检 */
 			if (timeStamp == SELFTESTTIME || testFlag == 1) {
 				selfTest();
@@ -732,37 +732,40 @@ void loadMainPage(void) {
 	temp[2] = 0x12;
 	temp[3] = 0x00;
 
-	//跳转主画面3
-	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
-			&& saveData[2].nameIndex != 0) {
-		temp[4] = 0x01;
-	}
 	//跳转主画面1-1
 	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
 			&& saveData[2].nameIndex == 0) {
 		temp[4] = PAGE_MAIN11;
 	}
 	//跳转主画面1-2
-	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
+	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex == 0) {
 		temp[4] = PAGE_MAIN12;
 	}
 	//跳转主画面1-3
-	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex == 0
+	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex == 0
 			&& saveData[2].nameIndex != 0) {
-		temp[4] = PAGE_MAIN213;
+		temp[4] = PAGE_MAIN13;
 	}
 	//跳转主画面2-12
-	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
+	else if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex == 0) {
 		temp[4] = PAGE_MAIN212;
 	}
+	//跳转主画面2-13
+	else if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
+			&& saveData[2].nameIndex != 0) {
+		temp[4] = PAGE_MAIN213;
+	}
 	//跳转主画面2-23
-	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
+	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex != 0) {
 		temp[4] = PAGE_MAIN223;
 	}
-
+	//跳转主画面3
+	else {
+		temp[4] = 0x01;
+	}
 	/* 通道 1 名称 */
 	temp[5] = 0x00;
 	temp[6] = 0x0F;
@@ -1005,24 +1008,7 @@ void loadMainPage(void) {
 	}
 	//修改音量图标
 	HAL_UART_Transmit(&huart2, volumePicCMD, 12, 0xFFFF);
-	//跳转主画面3
-	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
-			&& saveData[2].nameIndex != 0) {
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		temp[0] = 0xEE;  			//帧头
-		temp[1] = NOTIFY_CONTROL;	//命令类型(UPDATE_CONTROL)
-		temp[2] = 0x00; 			//CtrlMsgType-指示消息的类型
-		temp[3] = 0x00;  			//产生消息的画面ID
-		temp[4] = 0x01;
-		temp[5] = 0xFF;   			//帧尾
-		temp[6] = 0xFC;
-		temp[7] = 0xFF;
-		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
-		lastPage = currentPage;
-		currentPage = PAGE_MAIN3;
-	}
+
 	//跳转主画面1-1
 	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
 			&& saveData[2].nameIndex == 0) {
@@ -1042,7 +1028,7 @@ void loadMainPage(void) {
 		currentPage = PAGE_MAIN11;
 	}
 	//跳转主画面1-2
-	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
+	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex == 0) {
 		//跳转至主屏幕
 		//EE B1 00 00 01 FF FC FF FF
@@ -1060,7 +1046,7 @@ void loadMainPage(void) {
 		currentPage = PAGE_MAIN12;
 	}
 	//跳转主画面1-3
-	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex == 0
+	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex == 0
 			&& saveData[2].nameIndex != 0) {
 		//跳转至主屏幕
 		//EE B1 00 00 01 FF FC FF FF
@@ -1075,10 +1061,10 @@ void loadMainPage(void) {
 		temp[8] = 0xFF;
 		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
 		lastPage = currentPage;
-		currentPage = PAGE_MAIN213;
+		currentPage = PAGE_MAIN13;
 	}
 	//跳转主画面2-12
-	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
+	else if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex == 0) {
 		//跳转至主屏幕
 		//EE B1 00 00 01 FF FC FF FF
@@ -1095,8 +1081,26 @@ void loadMainPage(void) {
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN212;
 	}
+	//跳转主画面2-13
+	else if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
+			&& saveData[2].nameIndex != 0) {
+		//跳转至主屏幕
+		//EE B1 00 00 01 FF FC FF FF
+		temp[0] = 0xEE;  			//帧头
+		temp[1] = NOTIFY_CONTROL;	//命令类型(UPDATE_CONTROL)
+		temp[2] = 0x00; 			//CtrlMsgType-指示消息的类型
+		temp[3] = 0x00;  			//产生消息的画面ID
+		temp[4] = 0x0C;
+		temp[5] = 0xFF;   			//帧尾
+		temp[6] = 0xFC;
+		temp[7] = 0xFF;
+		temp[8] = 0xFF;
+		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		lastPage = currentPage;
+		currentPage = PAGE_MAIN213;
+	}
 	//跳转主画面2-23
-	if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
+	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex != 0) {
 		//跳转至主屏幕
 		//EE B1 00 00 01 FF FC FF FF
@@ -1112,6 +1116,23 @@ void loadMainPage(void) {
 		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN223;
+	}
+	//跳转主画面3
+	else {
+		//跳转至主屏幕
+		//EE B1 00 00 01 FF FC FF FF
+		temp[0] = 0xEE;  			//帧头
+		temp[1] = NOTIFY_CONTROL;	//命令类型(UPDATE_CONTROL)
+		temp[2] = 0x00; 			//CtrlMsgType-指示消息的类型
+		temp[3] = 0x00;  			//产生消息的画面ID
+		temp[4] = 0x01;
+		temp[5] = 0xFF;   			//帧尾
+		temp[6] = 0xFC;
+		temp[7] = 0xFF;
+		temp[8] = 0xFF;
+		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		lastPage = currentPage;
+		currentPage = PAGE_MAIN3;
 	}
 }/* End loadMainPage() */
 
@@ -1558,6 +1579,11 @@ void updateUI(void) {
 	// FF FC FF FF
 	multiUICMD[4] = currentPage;
 	for (i = 0; i < 3; i++) {
+		statusColorCMD[i][4] = currentPage;
+		numColorCMD[i][4] = currentPage;
+		percentPicCMD[i][4] = currentPage;
+	}
+	for (i = 0; i < 3; i++) {
 		if (saveData[i].nameIndex == 0) {
 			float_ADCValue[i] = 0;
 		}
@@ -1587,7 +1613,6 @@ void updateUI(void) {
 		multiUICMD[i + 27] = tempAdcASCii[i];
 	}
 	/* 通道 1 */
-	//testGitHubname
 	//正常
 	if ((float_ADCValue[0] > saveData[0].lower_limit)
 			&& (float_ADCValue[0] < saveData[0].upper_limit)
@@ -1918,8 +1943,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef* uartHandle) {
 
 }
 /**
- * 函数功能: 按键外部中断服务函数
- * 输入参数: GPIO_PIN：中断引脚
+ * 函数功能: 串口空闲中断服务函数
+ * 输入参数: uartHandle：串口号
  * 返 回 值: 无
  * 说    明: 无
  */
@@ -2006,6 +2031,11 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 		__HAL_UART_CLEAR_IDLEFLAG(&huart3);
 		HAL_UART_DMAStop(&huart3);
 		bluetoothFlag = 1;
+		//todo
+		/* 蓝牙连接判断 */
+		/* 未连接蓝牙不操作 */
+		/* 已连接蓝牙发送当前所有数据 */
+		/* 已连接蓝牙收到设置命令，保存数据到flash */
 	}
 }
 
@@ -2042,21 +2072,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* tim_baseHandle) {
 	if (currentPage == PAGE_START && (currentTime - timeStamp) >= 150) {
 		uint8_t temp[9];
 		//跳转主画面3
-		if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
-				&& saveData[2].nameIndex != 0) {
-			//跳转至主屏幕
-			//EE B1 00 00 01 FF FC FF FF
-			temp[0] = 0xEE;  			//帧头
-			temp[1] = NOTIFY_CONTROL;	//命令类型(UPDATE_CONTROL)
-			temp[2] = 0x00; 			//CtrlMsgType-指示消息的类型
-			temp[3] = 0x00;  			//产生消息的画面ID
-			temp[4] = 0x01;
-			temp[5] = 0xFF;   			//帧尾
-			temp[6] = 0xFC;
-			temp[7] = 0xFF;
-			temp[8] = 0xFF;
-			HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
-		}
+		//跳转至主屏幕
+		//EE B1 00 00 01 FF FC FF FF
+		temp[0] = 0xEE;  			//帧头
+		temp[1] = NOTIFY_CONTROL;	//命令类型(UPDATE_CONTROL)
+		temp[2] = 0x00; 			//CtrlMsgType-指示消息的类型
+		temp[3] = 0x00;  			//产生消息的画面ID
+		temp[4] = 0x01;
+		temp[5] = 0xFF;   			//帧尾
+		temp[6] = 0xFC;
+		temp[7] = 0xFF;
+		temp[8] = 0xFF;
+		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN3;
 		timeStamp = SELFTESTTIME;
