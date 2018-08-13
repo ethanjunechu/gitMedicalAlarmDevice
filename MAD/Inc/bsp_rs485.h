@@ -8,8 +8,8 @@
 extern uint8_t RS485_RX_BUF[];  	//接收缓冲
 
 //模式控制
-#define RS485_TX_ON()   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);__HAL_UART_DISABLE_IT(&huart1, UART_IT_RXNE)
-#define RS485_TX_OFF()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE)
+#define RS485_TX_ON()   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);__HAL_UART_DISABLE_IT(&huart3, UART_IT_RXNE)
+#define RS485_TX_OFF()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE)
 
 
 /********************************************************************

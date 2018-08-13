@@ -185,6 +185,6 @@ unsigned short CRC16(unsigned char *puchMsg, unsigned short usDataLen)
 void RS485_Send_Data(uint8_t *buf,uint8_t len)
 {
   RS485_TX_ON();     //设置为发送模式
-  HAL_UART_Transmit(&huart1, (uint8_t *)buf, len, 0xFFFF);
+  HAL_UART_Transmit(&huart3, (uint8_t *)buf, len, 0xFFFF);
   RS485_TX_OFF();    //设置为接收模式
 }

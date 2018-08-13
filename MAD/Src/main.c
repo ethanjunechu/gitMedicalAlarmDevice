@@ -70,7 +70,7 @@
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
 PUTCHAR_PROTOTYPE {
-	HAL_UART_Transmit(&huart1, (uint8_t *) &ch, 1, 0xFFFF);
+	HAL_UART_Transmit(&huart3, (uint8_t *) &ch, 1, 0xFFFF);
 	return ch;
 }
 
@@ -259,9 +259,9 @@ int main(void) {
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 	MX_DMA_Init();
-	MX_USART3_UART_Init();
-	MX_USART2_UART_Init();
 	MX_USART1_UART_Init();
+	MX_USART2_UART_Init();
+	MX_USART3_UART_Init();
 	MX_SPI2_Init();
 	MX_SPI1_Init();
 	MX_ADC1_Init();
@@ -490,6 +490,7 @@ void application(void) {
 	LEDPOWERC(1);
 
 	/* 读取 FLASH 储存的设置 */
+
 	uint8_t i = 0;
 	eepromReadSetting();
 	for (i = 0; i < 6; i++) {
@@ -503,7 +504,6 @@ void application(void) {
 		eepromWriteSetting();
 		eepromReadSetting();
 	}
-
 	/* 功能初始化 start */
 	/* RS485 接收模式 */
 	RS485_TX_OFF()
@@ -512,92 +512,97 @@ void application(void) {
 	/* 启动AD转换并使能DMA传输和中断 */
 	HAL_ADCEx_Calibration_Start(&hadc1);
 	HAL_ADC_Start_DMA(&hadc1, ADC_ConvertedValue, ADC_NUMOFCHANNEL);
-
 	/* 启动Timer1 */
 	if (HAL_TIM_Base_Start_IT(&htim2) != HAL_OK) {
 		/* Starting Error */
 		while (1)
 			;
+
 	}
 
 	/* main 函数 while(1) 前，启动一次 DMA 接收 */
+	if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+	CMD_MAX_SIZE) != HAL_OK) {
+		Error_Handler();
+	}
 	if (HAL_UART_Receive_DMA(&huart2, (uint8_t *) RS232_RX_BUF,
 	CMD_MAX_SIZE) != HAL_OK) {
 		Error_Handler();
 	}
-	if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) RS485_RX_BUF, 8) != HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
-	CMD_MAX_SIZE) != HAL_OK) {
+	if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) RS485_RX_BUF, 8) != HAL_OK) {
 		Error_Handler();
 	}
 	/* 开启串口空闲中断 */
-	__HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
 	__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+	__HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
 	__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
 
 	/* 设置蓝牙 */
-//	while (1) {
-//		if (bluetoothFlag == 1) {
-//			if (BLUETOOTH_RX_BUF[0] == 'O' && BLUETOOTH_RX_BUF[1] == 'K'
-//					&& BLUETOOTH_RX_BUF[2] == '+' && BLUETOOTH_RX_BUF[3] == 'L'
-//					&& BLUETOOTH_RX_BUF[4] == 'A' && BLUETOOTH_RX_BUF[5] == 'D'
-//					&& BLUETOOTH_RX_BUF[6] == 'D'
-//					&& BLUETOOTH_RX_BUF[7] == ':') {
-//				uint8_t i = 0;
-//				/* 设置蓝牙NAME */
-//				//蓝牙界面文本
-//				//EE B1 10 00 0E 00 03 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
-//				uint8_t temp[23] = { 0xEE, 0xB1, 0x10, 0x00, 0x0E, 0x00, 0x03,
-//						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-//						0x00, 0x00, 0x00, 0xFF, 0xFC, 0xFF, 0xFF };
-//				//蓝牙界面二维码
-//				//EE B1 10 00 0E 00 01 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
-//				uint8_t setBluetoothName[21] = { 'A', 'T', '+', 'N', 'A', 'M',
-//						'E', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-//						0x00, 0x00, 0x00, 0x00, 0x0D, 0x0A };
-//				for (; i < 11; i++) {
-//					setBluetoothName[i + 6] = BLUETOOTH_RX_BUF[i + 8];
-//					temp[i + 7] = BLUETOOTH_RX_BUF[i + 8];
-//				}
-//				HAL_UART_Transmit(&huart3, setBluetoothName, 21, 0xFFFF);
-//				//设置蓝牙界面文本
-//				HAL_UART_Transmit(&huart3, temp, 23, 0xFFFF);
-//				//设置蓝牙界面二维码
-//				temp[6] = 0x01;
-//				HAL_UART_Transmit(&huart3, temp, 23, 0xFFFF);
-//				bluetoothFlag = 0;
-//				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
-//				CMD_MAX_SIZE) != HAL_OK) {
-//					Error_Handler();
-//				}
-//				/* 开启串口空闲中断 */
-//				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-//				break;
-//			} else {
-//				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
-//				CMD_MAX_SIZE) != HAL_OK) {
-//					Error_Handler();
-//				}
-//				/* 开启串口空闲中断 */
-//				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-//			}
-//		} else {
-//			if (timeStamp > 500) {
-//				if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) BLUETOOTH_RX_BUF,
-//				CMD_MAX_SIZE) != HAL_OK) {
-//					//TODO加入蓝牙芯片后开启
-////					Error_Handler();
-//				}
-//				/* 开启串口空闲中断 */
-//				__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
-//				break;
-//			}
-//			setBluetooth();
-//			HAL_Delay(1000);
-//		}
-//	}/* End 设置蓝牙 */
+	while (1) {
+		if (bluetoothFlag == 1) {
+			if (BLUETOOTH_RX_BUF[0] == 'O' && BLUETOOTH_RX_BUF[1] == 'K'
+					&& BLUETOOTH_RX_BUF[2] == '+' && BLUETOOTH_RX_BUF[3] == 'L'
+					&& BLUETOOTH_RX_BUF[4] == 'A' && BLUETOOTH_RX_BUF[5] == 'D'
+					&& BLUETOOTH_RX_BUF[6] == 'D'
+					&& BLUETOOTH_RX_BUF[7] == ':') {
+				uint8_t i = 0;
+
+				/* 设置蓝牙NAME */
+				//蓝牙界面文本
+				//EE B1 10 00 0E 00 03 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
+				uint8_t temp[23] = { 0xEE, 0xB1, 0x10, 0x00, 0x0E, 0x00, 0x03,
+						0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+						0x00, 0x00, 0x00, 0xFF, 0xFC, 0xFF, 0xFF };
+				//蓝牙界面二维码
+				//EE B1 10 00 0E 00 01 30 30 31 37 45 41 30 39 32 33 41 45 FF FC FF FF
+				uint8_t setBluetoothName[19] = { 'A', 'T', '+', 'N', 'A', 'M',
+						'E', 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+						0x00, 0x00, 0x0D, 0x0A };
+				for (i = 0; i < 12; i++) {
+					setBluetoothName[i + 7] = BLUETOOTH_RX_BUF[i + 10];
+					temp[i + 7] = BLUETOOTH_RX_BUF[i + 8];
+				}
+				HAL_UART_Transmit(&huart1, setBluetoothName, 19, 0xFFFF);
+				//设置蓝牙界面文本
+				HAL_UART_Transmit(&huart2, temp, 23, 0xFFFF);
+				//设置蓝牙界面二维码
+				temp[6] = 0x01;
+				HAL_UART_Transmit(&huart2, temp, 23, 0xFFFF);
+				bluetoothFlag = 2;
+				memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
+				if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+				CMD_MAX_SIZE) != HAL_OK) {
+					Error_Handler();
+				}
+				/* 开启串口空闲中断 */
+				__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+				break;
+			} else {
+				memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
+				if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+				CMD_MAX_SIZE) != HAL_OK) {
+					Error_Handler();
+				}
+				/* 开启串口空闲中断 */
+				__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+			}
+		} else {
+			if (currentTime > 500) {
+				bluetoothFlag = 0;
+				memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
+				if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+				CMD_MAX_SIZE) != HAL_OK) {
+					//TODO加入蓝牙芯片后开启
+					//Error_Handler();
+				}
+				/* 开启串口空闲中断 */
+				__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+				break;
+			}
+			setBluetooth();
+			HAL_Delay(1000);
+		}
+	}/* End 设置蓝牙 */
 	/* 启动检查画面 */
 	uint8_t temp[7];
 	temp[0] = 0xEE;  			//帧头
@@ -653,25 +658,19 @@ void application(void) {
  * @历史版本 : V0.0.1 - Ethan - 2018/01/03
  */
 void eepromReadSetting(void) {
-	HAL_NVIC_DisableIRQ(USART1_IRQn);
+//	HAL_NVIC_DisableIRQ(USART1_IRQn);
 	HAL_NVIC_DisableIRQ(USART2_IRQn);
+	HAL_NVIC_DisableIRQ(USART3_IRQn);
 	HAL_NVIC_DisableIRQ(DMA1_Channel1_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel4_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel5_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel6_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel7_IRQn);
 	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
 	HAL_NVIC_DisableIRQ(TIM2_IRQn);
 	HAL_Delay(1000);
 	SPI_FLASH_BufferRead((uint8_t *) &saveData, 0, 300);
 	HAL_Delay(1000);
-	HAL_NVIC_EnableIRQ(USART1_IRQn);
+//	HAL_NVIC_EnableIRQ(USART1_IRQn);
 	HAL_NVIC_EnableIRQ(USART2_IRQn);
+	HAL_NVIC_EnableIRQ(USART3_IRQn);
 	HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 	HAL_NVIC_EnableIRQ(TIM2_IRQn);
 }/* End eepromReadSetting() */
@@ -685,11 +684,8 @@ void eepromReadSetting(void) {
 void eepromWriteSetting(void) {
 	HAL_NVIC_DisableIRQ(USART1_IRQn);
 	HAL_NVIC_DisableIRQ(USART2_IRQn);
+	HAL_NVIC_DisableIRQ(USART3_IRQn);
 	HAL_NVIC_DisableIRQ(DMA1_Channel1_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel4_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel5_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel6_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel7_IRQn);
 	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
 	HAL_NVIC_DisableIRQ(TIM2_IRQn);
 	HAL_Delay(1000);
@@ -698,11 +694,8 @@ void eepromWriteSetting(void) {
 	HAL_Delay(1000);
 	HAL_NVIC_EnableIRQ(USART1_IRQn);
 	HAL_NVIC_EnableIRQ(USART2_IRQn);
+	HAL_NVIC_EnableIRQ(USART3_IRQn);
 	HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
 	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 	HAL_NVIC_EnableIRQ(TIM2_IRQn);
 }/* End eepromWriteSetting() */
@@ -959,39 +952,39 @@ void loadMainPage(void) {
 
 	set485rom(0);
 
-	huart1.Instance = USART1;
+	huart3.Instance = USART3;
 	switch (saveData[0].baudrateIndex) {
 	case 0:
-		huart1.Init.BaudRate = 2400;
+		huart3.Init.BaudRate = 2400;
 		break;
 	case 1:
-		huart1.Init.BaudRate = 4800;
+		huart3.Init.BaudRate = 4800;
 		break;
 	case 2:
-		huart1.Init.BaudRate = 9600;
+		huart3.Init.BaudRate = 9600;
 		break;
 	case 3:
-		huart1.Init.BaudRate = 19200;
+		huart3.Init.BaudRate = 19200;
 		break;
 	case 4:
-		huart1.Init.BaudRate = 38400;
+		huart3.Init.BaudRate = 38400;
 		break;
 	}
-	huart1.Init.WordLength = UART_WORDLENGTH_8B;
-	huart1.Init.StopBits = UART_STOPBITS_1;
-	huart1.Init.Parity = UART_PARITY_NONE;
-	huart1.Init.Mode = UART_MODE_TX_RX;
-	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-	if (HAL_UART_Init(&huart1) != HAL_OK) {
+	huart3.Init.WordLength = UART_WORDLENGTH_8B;
+	huart3.Init.StopBits = UART_STOPBITS_1;
+	huart3.Init.Parity = UART_PARITY_NONE;
+	huart3.Init.Mode = UART_MODE_TX_RX;
+	huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+	if (HAL_UART_Init(&huart3) != HAL_OK) {
 		_Error_Handler(__FILE__, __LINE__);
 	}
 	/* 启动一次 DMA 接收 */
-	if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) RS485_RX_BUF, 8) != HAL_OK) {
+	if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) RS485_RX_BUF, 8) != HAL_OK) {
 		Error_Handler();
 	}
-	/* 开启串口1空闲中断 */
-	__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+	/* 开启串口3空闲中断 */
+	__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
 
 	//修改音量图标
 	if (muteFlag == 1) {
@@ -1951,7 +1944,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef* uartHandle) {
 void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 	uint32_t temp;
 
-	if (__HAL_UART_GET_FLAG(&huart1,UART_FLAG_IDLE) != RESET) {
+	if (__HAL_UART_GET_FLAG(&huart3, UART_FLAG_IDLE) != RESET) {
+		__HAL_UART_CLEAR_IDLEFLAG(&huart3);
+		HAL_UART_DMAStop(&huart3);
+
 		unsigned char buffer[8];
 		uint8_t send_mydata[150];
 		unsigned short crc;
@@ -1959,9 +1955,6 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 		unsigned int record_num, record_add;
 		//调试用
 		RS485_Send_Data(RS485_RX_BUF, 8);
-
-		__HAL_UART_CLEAR_IDLEFLAG(&huart1);
-		HAL_UART_DMAStop(&huart1);
 
 		crc = CRC16(RS485_RX_BUF, 6);
 		//  buffer[6]=crc&0xff;
@@ -2013,29 +2006,118 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 			;
 		}
 		memset(RS485_RX_BUF, 0xFF, sizeof(RS485_RX_BUF));
-
-		HAL_UART_Receive_DMA(&huart1, (uint8_t *) RS485_RX_BUF, 8); //重新使能DMA接收
-		/* 开启串口1空闲中断 */
-		__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+		if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) RS485_RX_BUF, 8)
+				!= HAL_OK) {
+//			Error_Handler();
+		}
 	}
-	if (__HAL_UART_GET_FLAG(&huart2,UART_FLAG_IDLE) != RESET) {
+
+	if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET) {
 		__HAL_UART_CLEAR_IDLEFLAG(&huart2);
+		HAL_UART_DMAStop(&huart2);
+
 		temp = huart2.Instance->SR;
 		temp = huart2.Instance->DR;
-		HAL_UART_DMAStop(&huart2);
 		temp = hdma_usart2_rx.Instance->CNDTR;
 		RS232_recvLength = CMD_MAX_SIZE - temp;
 		RS232_recvEndFlag = 1;
 	}
-	if (__HAL_UART_GET_FLAG(&huart3, UART_IT_IDLE) != RESET) {
-		__HAL_UART_CLEAR_IDLEFLAG(&huart3);
-		HAL_UART_DMAStop(&huart3);
-		bluetoothFlag = 1;
-		//todo
-		/* 蓝牙连接判断 */
-		/* 未连接蓝牙不操作 */
-		/* 已连接蓝牙发送当前所有数据 */
-		/* 已连接蓝牙收到设置命令，保存数据到flash */
+	/* 蓝牙接收 */
+	if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) != RESET) {
+		__HAL_UART_CLEAR_IDLEFLAG(&huart1);
+		HAL_UART_DMAStop(&huart1);
+		if (bluetoothFlag == 0) {
+			bluetoothFlag = 1;
+		} else {
+//todo
+			/* 蓝牙连接判断 */
+			/* 未连接蓝牙不操作 */
+			/* 已连接蓝牙发送当前所有数据 */
+			unsigned char buffer[8];
+			uint8_t send_mydata[150];
+			unsigned short crc;
+			unsigned char i, sendcount;
+			unsigned int record_num, record_add;
+
+			crc = CRC16(BLUETOOTH_RX_BUF, (BLUETOOTH_RX_BUF[1] == 0x03 ? 6 : (BLUETOOTH_RX_BUF[6] + 7)));
+			//  buffer[6]=crc&0xff;
+			//  buffer[7]=(crc&0xff00)>>8;
+			//  modscan 是校验码高位在前，低位在后
+			buffer[7] = crc & 0xff;
+			buffer[6] = (crc & 0xff00) >> 8;
+
+			// 判断地址与crc校验
+			if ((BLUETOOTH_RX_BUF[0] == 0xFF)
+					&& (BLUETOOTH_RX_BUF[1] == 0x03)     //读取命令
+					&& (BLUETOOTH_RX_BUF[6] == buffer[6])
+					&& (BLUETOOTH_RX_BUF[7] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。�
+				// 获取数据
+				//清空
+				memset(send_mydata, 0, sizeof(send_mydata));
+				// 地址
+				send_mydata[0] = 0xFF;         //地址
+				send_mydata[1] = 0x03;         // 功能码
+				send_mydata[2] = BLUETOOTH_RX_BUF[5] << 1;         // 寄存器个数乘以二
+
+				record_add = BLUETOOTH_RX_BUF[2] << 8 | BLUETOOTH_RX_BUF[3]; //组合为复合地址
+				if (record_add > 256)
+					record_add = 256;
+				record_num = BLUETOOTH_RX_BUF[5] * 2; //组合为数据长度＠├┱阔啊站 看扩展为2倍 数量�
+				if (record_num > 128)
+					record_num = 128;
+
+				// rom485[61]//=rom485[81];
+				//  rom485[63]//=rom485[83];
+				//修改真空报警状态， 上下报警互换
+
+				memcpy((&send_mydata[3]), &rom485[record_add * 2], record_num); //加一大段数据
+				i = record_num + 3;
+
+				//添加校验码   modscan 高位在前
+
+				crc = CRC16(send_mydata, i);
+				send_mydata[i] = (crc & 0xff00) >> 8;
+				send_mydata[i + 1] = crc & 0xff;
+
+				sendcount = i + 2;
+				//for (i = 0; i < sendcount; i++)
+				HAL_UART_Transmit(&huart1, send_mydata, sendcount, 0xFFFF);
+			}
+			// 判断地址与crc校验
+			if ((BLUETOOTH_RX_BUF[0] == 0xFF)
+					&& (BLUETOOTH_RX_BUF[1] == 0x10)     //读取命令
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 7] == buffer[6])
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 8] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。�
+				// 获取数据
+
+				//todo
+				//根据蓝牙接收进行保存更新设置
+
+				//清空
+				memset(send_mydata, 0, sizeof(send_mydata));
+				// 地址
+				send_mydata[0] = 0xFF;         //地址
+				send_mydata[1] = 0x10;         // 功能码
+				send_mydata[2] = BLUETOOTH_RX_BUF[2];	//起始寄存器地址
+				send_mydata[3] = BLUETOOTH_RX_BUF[3];
+				send_mydata[4] = BLUETOOTH_RX_BUF[4];
+				send_mydata[5] = BLUETOOTH_RX_BUF[5];
+
+				crc = CRC16(send_mydata, 6);
+				send_mydata[6] = (crc & 0xff00) >> 8;
+				send_mydata[7] = crc & 0xff;
+
+				HAL_UART_Transmit(&huart1, send_mydata, 8, 0xFFFF);
+			}
+			memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
+			if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+			CMD_MAX_SIZE) != HAL_OK) {
+				Error_Handler();
+			}
+			/* 开启串口空闲中断 */
+			__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+			/* 已连接蓝牙收到设置命令，保存数据到flash */
+		}
 	}
 }
 
@@ -2071,9 +2153,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* tim_baseHandle) {
 	}
 	if (currentPage == PAGE_START && (currentTime - timeStamp) >= 150) {
 		uint8_t temp[9];
-		//跳转主画面3
-		//跳转至主屏幕
-		//EE B1 00 00 01 FF FC FF FF
+//跳转主画面3
+//跳转至主屏幕
+//EE B1 00 00 01 FF FC FF FF
 		temp[0] = 0xEE;  			//帧头
 		temp[1] = NOTIFY_CONTROL;	//命令类型(UPDATE_CONTROL)
 		temp[2] = 0x00; 			//CtrlMsgType-指示消息的类型
@@ -2535,8 +2617,8 @@ void checkLic(void) {
 void setBluetooth(void) {
 	/* 查询蓝牙MAC地址 */
 	uint8_t getBluetoothMAC[10] = { 'A', 'T', '+', 'A', 'D', 'D', 'R', '?',
-			0x0D, 0x0A };
-	HAL_UART_Transmit(&huart3, getBluetoothMAC, 10, 0xFFFF);
+			'\r', '\n' };
+	HAL_UART_Transmit(&huart1, getBluetoothMAC, 10, 0xFFFF);
 }
 
 void bsp_Delay_Nus(uint16_t time) {
