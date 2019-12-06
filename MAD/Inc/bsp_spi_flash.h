@@ -59,9 +59,12 @@ extern SPI_HandleTypeDef hspi2;
 void MX_SPIFlash_Init(void);
 void SPI_FLASH_SectorErase(uint32_t SectorAddr);
 void SPI_FLASH_BulkErase(void);
-void SPI_FLASH_PageWrite(uint8_t* pBuffer, uint32_t WriteAddr, uint16_t NumByteToWrite);
-void SPI_FLASH_BufferWrite(uint8_t* pBuffer, uint32_t WriteAddr, uint16_t NumByteToWrite);
-void SPI_FLASH_BufferRead(uint8_t* pBuffer, uint32_t ReadAddr, uint16_t NumByteToRead);
+void SPI_FLASH_PageWrite(uint8_t* pBuffer, uint32_t WriteAddr,
+		uint16_t NumByteToWrite);
+void SPI_FLASH_BufferWrite(uint8_t* pBuffer, uint32_t WriteAddr,
+		uint16_t NumByteToWrite);
+void SPI_FLASH_BufferRead(uint8_t* pBuffer, uint32_t ReadAddr,
+		uint16_t NumByteToRead);
 uint32_t SPI_FLASH_ReadID(void);
 uint32_t SPI_FLASH_ReadDeviceID(void);
 void SPI_FLASH_StartReadSequence(uint32_t ReadAddr);

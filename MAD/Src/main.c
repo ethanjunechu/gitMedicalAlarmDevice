@@ -70,7 +70,7 @@
 #define PUTCHAR_PROTOTYPE int fputc(int ch, FILE *f)
 #endif /* __GNUC__ */
 PUTCHAR_PROTOTYPE {
-	HAL_UART_Transmit(&huart3, (uint8_t *) &ch, 1, 0xFFFF);
+	HAL_UART_Transmit(&huart3, (uint8_t*) &ch, 1, 0x000F);
 	return ch;
 }
 
@@ -85,6 +85,12 @@ PUTCHAR_PROTOTYPE {
 extern char date_1302[];
 //extern char time_1302[];
 
+/* 软件版本号 */
+//EE B1 10 00 03 00 63 56 65 72 2E 32 30 31 39 30 37 31 39 FF FC FF FF
+uint8_t Ver[23] = { 0xEE, 0xB1, 0x10, 0x00, 0x03, 0x00, 0x63, 0x56, 0x65, 0x72,
+		0x2E, 0x32, 0x30, 0x31, 0x39, 0x30, 0x37, 0x31, 0x39, 0xFF, 0xFC, 0xFF,
+		0xFF };
+
 /* RS485-RS232 参数 */
 extern uint8_t RS485_RX_BUF[8];
 unsigned char rom485[256];
@@ -94,7 +100,8 @@ extern DMA_HandleTypeDef hdma_usart2_rx;
 uint8_t rom485[256];
 uint8_t RS232_recvEndFlag = 0;
 uint8_t RS232_recvLength = 0;
-
+uint16_t SendTime = 0xFFFF;
+//todo 确认是否定义继电器IO
 /* UI 相关参数 */
 /* 发送AD值和超压欠压状态 */
 // EE B1 12 00 01
@@ -105,16 +112,40 @@ uint8_t RS232_recvLength = 0;
 // 00 0B 00 04 B3 AC D1 B9	  状态2
 // 00 0E 00 04 C7 B7 D1 B9	  状态3
 // FF FC FF FF
-uint8_t multiUICMD[60] = { 0xEE, 0xB1, 0x12, 0x00, 0x01, 0x00, 26, 0x00, 0x05,
+//uint8_t multiUICMD[60] = { 0xEE, 0xB1, 0x12, 0x00, 0x01, 0x00, 26, 0x00, 0x05,
+//		0x2D, 0x31, 0x2E, 0x32, 0x37, 0x00, 27, 0x00, 0x05, 0x20, 0x31, 0x2E,
+//		0x32, 0x37, 0x00, 28, 0x00, 0x05, 0x20, 0x31, 0x2E, 0x32, 0x37, 0x00,
+//		0x08, 0x00, 0x04, 0xD5, 0xFD, 0xB3, 0xA3, 0x00, 0x0B, 0x00, 0x04, 0xB3,
+//		0xAC, 0xD1, 0xB9, 0x00, 0x0E, 0x00, 0x04, 0xC7, 0xB7, 0xD1, 0xB9, 0xFF,
+//		0xFC, 0xFF, 0xFF };
+uint8_t multiUICMD[78] = { 0xEE, 0xB1, 0x12, 0x00, 0x01, 0x00, 26, 0x00, 0x05,
 		0x2D, 0x31, 0x2E, 0x32, 0x37, 0x00, 27, 0x00, 0x05, 0x20, 0x31, 0x2E,
 		0x32, 0x37, 0x00, 28, 0x00, 0x05, 0x20, 0x31, 0x2E, 0x32, 0x37, 0x00,
-		0x08, 0x00, 0x04, 0xD5, 0xFD, 0xB3, 0xA3, 0x00, 0x0B, 0x00, 0x04, 0xB3,
-		0xAC, 0xD1, 0xB9, 0x00, 0x0E, 0x00, 0x04, 0xC7, 0xB7, 0xD1, 0xB9, 0xFF,
-		0xFC, 0xFF, 0xFF };
+		0x08, 0x00, 0x0A, 0x20, 0x20, 0x20, 0xD5, 0xFD, 0xB3, 0xA3, 0x20, 0x20,
+		0x20, 0x00, 0x0B, 0x00, 0x0A, 0x20, 0x20, 0x20, 0xB3, 0xAC, 0xD1, 0xB9,
+		0x20, 0x20, 0x20, 0x00, 0x0E, 0x00, 0x0A, 0x20, 0x20, 0x20, 0xC7, 0xB7,
+		0xD1, 0xB9, 0x20, 0x20, 0x20, 0xFF, 0xFC, 0xFF, 0xFF };
+/* 无信号输入 - 特殊显示 */
+//EE B1 10 00 01 00 08 CE DE D0 C5 BA C5 CA E4 C8 EB FF FC FF FF
+//uint8_t unconnectCMD[3][21] = { { 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x08,
+//		0xCE, 0xDE, 0xD0, 0xC5, 0xBA, 0xC5, 0xCA, 0xE4, 0xC8, 0xEB, 0xFF, 0xFC,
+//		0xFF, 0xFF },
+//		{ 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x0B, 0xCE, 0xDE, 0xD0, 0xC5,
+//				0xBA, 0xC5, 0xCA, 0xE4, 0xC8, 0xEB, 0xFF, 0xFC, 0xFF, 0xFF },
+//		{ 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x0E, 0xCE, 0xDE, 0xD0, 0xC5,
+//				0xBA, 0xC5, 0xCA, 0xE4, 0xC8, 0xEB, 0xFF, 0xFC, 0xFF, 0xFF } };
+///* 未使用 - 特殊显示 */
+////EE B1 10 00 01 00 08 CE B4 CA B9 D3 C3 FF FC FF FF
+//uint8_t unusedCMD[3][17] = { { 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x08, 0xCE,
+//		0xB4, 0xCA, 0xB9, 0xD3, 0xC3, 0xFF, 0xFC, 0xFF, 0xFF }, { 0xEE, 0xB1,
+//		0x10, 0x00, 0x01, 0x00, 0x0B, 0xCE, 0xB4, 0xCA, 0xB9, 0xD3, 0xC3, 0xFF,
+//		0xFC, 0xFF, 0xFF }, { 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x0E, 0xCE,
+//		0xB4, 0xCA, 0xB9, 0xD3, 0xC3, 0xFF, 0xFC, 0xFF, 0xFF } };
 uint8_t lcd_number_x;
 uint8_t current_index[3] = { 0, 0, 0 };
 uint8_t currentPage = 0;
 uint8_t lastPage = 0;
+uint8_t mainpage = 0;
 extern uint8_t setTextGreen[];
 extern uint8_t setTextRed[];
 uint8_t statusColorCMD[3][13] = { { 0xEE, 0xB1, 0x19, 0x00, 0x01, 0x00, 0x08,
@@ -147,14 +178,16 @@ uint8_t licPassedCMD[11] = { 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x15, 0xFF,
 uint8_t licFailedCMD[19] = { 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x15, 0xD0,
 		0xE8, 0xD2, 0xAA, 0xB1, 0xA3, 0xD1, 0xF8, 0xFF, 0xFC, 0xFF, 0xFF };
 uint8_t licFlag = 0;
+uint8_t licFailedFlag = 0;
 
-extern uint8_t cnName[21][15];
-extern uint8_t enName[21][10];
+extern uint8_t chnName[23][14];
+extern uint8_t engName[23][13];
+extern uint8_t colorName[23][1];
 
 /* Led 控制 */
-/* 0 - 欠压 | 1 - 正常 | 2 - 超压 */
-uint8_t ledFlag[3] = { 1, 1, 1 };
-
+/* 0 - 正常 | 1 - 欠压 | 2 - 超压 */
+uint8_t ledFlag[3] = { 0, 0, 0 };
+int8_t doubleLight = 1;
 uint8_t testFlag = 0;
 
 /* 设置蓝牙标志 */
@@ -182,7 +215,7 @@ uint8_t currentCHN;
 
 /* 音频相关参数 */
 uint8_t bebe = 0;
-uint8_t muteFlag = 0;
+uint8_t muteFlag[3] = { 0, 0, 0 };
 uint8_t alarmFlag = 0;
 
 /* Timer 相关参数*/
@@ -210,17 +243,18 @@ void selfTest(void);
 void updateADC(void);
 void updateUI(void);
 void updateLed(void);
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* ADCHandle);
+//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *ADCHandle);
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle);
-void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle);
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* tim_baseHandle);
+void UART_RxIDLECallback(UART_HandleTypeDef *uartHandle);
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *tim_baseHandle);
 uint32_t calcDays(uint8_t y1, uint8_t m1, uint8_t d1, uint8_t y2, uint8_t m2,
 		uint8_t d2);
 void FloatToStr5(float data, uint8_t *buf, int size);
 float StrToFloat(uint8_t *buf);
 void set485rom(uint8_t func);
+void read485rom(uint8_t func);
 void change_float_big_485rom(unsigned int j);
-void Line_1A_WTN5(unsigned char SB_DATA);
+//void Line_1A_WTN5(unsigned char SB_DATA);
 void alarm_on(void);
 void alarm_off(void);
 void getCurrentPage(void);
@@ -274,19 +308,6 @@ int main(void) {
 //  printf("debug start\r\n");
 //  /* 12 颗 LED 跑马灯测试 */
 //  printf("\r\nLED debug\r\n");
-//
-//  printf("LEDPOWERA-C\r\n");
-//  LEDPOWERA(1);
-//  HAL_Delay(500);
-//  LEDPOWERA(0);
-//
-//  LEDPOWERB(1);
-//  HAL_Delay(500);
-//  LEDPOWERB(0);
-//
-//  LEDPOWERC(1);
-//  HAL_Delay(500);
-//  LEDPOWERC(0);
 //
 //  printf("LED0A-C\r\n");
 //  LED0A(1);
@@ -472,6 +493,11 @@ void SystemClock_Config(void) {
  */
 void application(void) {
 
+	//关闭音频芯片继电器
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
+
+	/* 开机开关报警继电器 - 开 */
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
 	/* 开机指示灯 */
 	LED0A(1);
 	LED0B(1);
@@ -484,13 +510,9 @@ void application(void) {
 	LED2A(1);
 	LED2B(1);
 	LED2C(1);
-	/* LEDPOWER */
-	LEDPOWERA(1);
-	LEDPOWERB(1);
-	LEDPOWERC(1);
-
+	/* 开机开关报警继电器 - 关 */
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
 	/* 读取 FLASH 储存的设置 */
-
 	uint8_t i = 0;
 	eepromReadSetting();
 	for (i = 0; i < 6; i++) {
@@ -506,8 +528,7 @@ void application(void) {
 	}
 	/* 功能初始化 start */
 	/* RS485 接收模式 */
-	RS485_TX_OFF()
-	;
+	RS485_TX_OFF();
 
 	/* 启动AD转换并使能DMA传输和中断 */
 	HAL_ADCEx_Calibration_Start(&hadc1);
@@ -521,15 +542,15 @@ void application(void) {
 	}
 
 	/* main 函数 while(1) 前，启动一次 DMA 接收 */
-	if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+	if (HAL_UART_Receive_DMA(&huart1, (uint8_t*) BLUETOOTH_RX_BUF,
 	CMD_MAX_SIZE) != HAL_OK) {
 		Error_Handler();
 	}
-	if (HAL_UART_Receive_DMA(&huart2, (uint8_t *) RS232_RX_BUF,
+	if (HAL_UART_Receive_DMA(&huart2, (uint8_t*) RS232_RX_BUF,
 	CMD_MAX_SIZE) != HAL_OK) {
 		Error_Handler();
 	}
-	if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) RS485_RX_BUF, 8) != HAL_OK) {
+	if (HAL_UART_Receive_DMA(&huart3, (uint8_t*) RS485_RX_BUF, 8) != HAL_OK) {
 		Error_Handler();
 	}
 	/* 开启串口空闲中断 */
@@ -562,15 +583,15 @@ void application(void) {
 					setBluetoothName[i + 7] = BLUETOOTH_RX_BUF[i + 10];
 					temp[i + 7] = BLUETOOTH_RX_BUF[i + 8];
 				}
-				HAL_UART_Transmit(&huart1, setBluetoothName, 19, 0xFFFF);
+				HAL_UART_Transmit(&huart1, setBluetoothName, 19, SendTime);
 				//设置蓝牙界面文本
-				HAL_UART_Transmit(&huart2, temp, 23, 0xFFFF);
+				HAL_UART_Transmit(&huart2, temp, 23, SendTime);
 				//设置蓝牙界面二维码
 				temp[6] = 0x01;
-				HAL_UART_Transmit(&huart2, temp, 23, 0xFFFF);
+				HAL_UART_Transmit(&huart2, temp, 23, SendTime);
 				bluetoothFlag = 2;
 				memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
-				if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+				if (HAL_UART_Receive_DMA(&huart1, (uint8_t*) BLUETOOTH_RX_BUF,
 				CMD_MAX_SIZE) != HAL_OK) {
 					Error_Handler();
 				}
@@ -579,18 +600,20 @@ void application(void) {
 				break;
 			} else {
 				memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
-				if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
-				CMD_MAX_SIZE) != HAL_OK) {
-					Error_Handler();
-				}
+				HAL_UART_Receive_DMA(&huart1, (uint8_t*) BLUETOOTH_RX_BUF,
+				CMD_MAX_SIZE);
 				/* 开启串口空闲中断 */
 				__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+				setBluetooth();
+				HAL_Delay(1000);
+				bluetoothFlag = 0;
 			}
 		} else {
-			if (currentTime > 500) {
+			//currentTime - 等待蓝牙芯片响应时间
+			if (currentTime > 20) {
 				bluetoothFlag = 0;
 				memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
-				if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+				if (HAL_UART_Receive_DMA(&huart1, (uint8_t*) BLUETOOTH_RX_BUF,
 				CMD_MAX_SIZE) != HAL_OK) {
 					//TODO加入蓝牙芯片后开启
 					//Error_Handler();
@@ -604,7 +627,7 @@ void application(void) {
 		}
 	}/* End 设置蓝牙 */
 	/* 启动检查画面 */
-	uint8_t temp[7];
+	uint8_t temp[9];
 	temp[0] = 0xEE;  			//帧头
 	temp[1] = 0xB1;				//命令类型(UPDATE_CONTROL)
 	temp[2] = 0x01;
@@ -612,7 +635,7 @@ void application(void) {
 	temp[4] = 0xFC;
 	temp[5] = 0xFF;
 	temp[6] = 0xFF;
-	HAL_UART_Transmit(&huart2, temp, 7, 0xFFFF);
+	HAL_UART_Transmit(&huart2, temp, 7, SendTime);
 	/* 功能初始化 end */
 
 	/* 正常工作 */
@@ -622,19 +645,67 @@ void application(void) {
 
 			RS232_recvLength = 0;
 			RS232_recvEndFlag = 0;
-			HAL_UART_Receive_DMA(&huart2, (uint8_t *) RS232_RX_BUF,
+			HAL_UART_Receive_DMA(&huart2, (uint8_t*) RS232_RX_BUF,
 			CMD_MAX_SIZE);  //重新使能DMA接收
 			/* 开启串口2空闲中断 */
 			__HAL_UART_ENABLE_IT(&huart2, UART_IT_IDLE);
 		}
 		if (currentPage == PAGE_MAIN3
-				|| (PAGE_MAIN11 <= currentPage && currentPage <= PAGE_MAIN223)) {
+				|| (PAGE_MAIN11 <= currentPage && currentPage <= PAGE_LIC)) {
 			/* 自检 */
 			if (timeStamp == SELFTESTTIME || testFlag == 1) {
 				selfTest();
 			}
 			updateUI();
+			/* 自检 */
+			if (timeStamp == SELFTESTTIME || testFlag == 1) {
+				selfTest();
+			}
 			updateLed();
+			/* 自检 */
+			if (timeStamp == SELFTESTTIME || testFlag == 1) {
+				selfTest();
+			}
+			if (licFailedFlag > 0) {
+				if (licFailedFlag == 144) {
+					//跳转画面
+					//EE B1 00 00 01 FF FC FF FF
+					temp[0] = 0xEE;  			//帧头
+					temp[1] = 0xB1;				//命令类型(UPDATE_CONTROL)
+					temp[2] = 0x00;
+					temp[3] = 0x00;
+					temp[4] = PAGE_LIC;
+					temp[5] = 0xFF;   			//帧尾
+					temp[6] = 0xFC;
+					temp[7] = 0xFF;
+					temp[8] = 0xFF;
+					HAL_UART_Transmit(&huart2, temp, 9, SendTime);
+					licFailedCMD[4] = PAGE_LIC;
+					HAL_UART_Transmit(&huart2, licFailedCMD, 19, SendTime);
+					lastPage = currentPage;
+					currentPage = PAGE_LIC;
+				}
+				if (licFailedFlag == 196) {
+					//跳转画面
+					//EE B1 00 00 01 FF FC FF FF
+					temp[0] = 0xEE;  			//帧头
+					temp[1] = 0xB1;				//命令类型(UPDATE_CONTROL)
+					temp[2] = 0x00;
+					temp[3] = 0x00;
+					temp[4] = mainpage;
+					temp[5] = 0xFF;   			//帧尾
+					temp[6] = 0xFC;
+					temp[7] = 0xFF;
+					temp[8] = 0xFF;
+					HAL_UART_Transmit(&huart2, temp, 9, SendTime);
+					licFailedCMD[4] = lastPage;
+					HAL_UART_Transmit(&huart2, licFailedCMD, 19, SendTime);
+					currentPage = lastPage;
+					lastPage = PAGE_LIC;
+					licFailedFlag = 1;
+				}
+				licFailedFlag++;
+			}
 		}
 		if (licFlag == 1) {
 			checkLic();
@@ -652,8 +723,8 @@ void application(void) {
 } /* End application() */
 
 /**
- * @功能简介 : 将浮点数的各个位的数值转换成字符串
- * @入口参数 : data - 浮点数 | *buf - 转换结果保存位置 | 长度
+ * @功能简介 : 读取用户配置
+ * @入口参数 : 无
  * @出口参数 : 无
  * @历史版本 : V0.0.1 - Ethan - 2018/01/03
  */
@@ -665,7 +736,7 @@ void eepromReadSetting(void) {
 	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
 	HAL_NVIC_DisableIRQ(TIM2_IRQn);
 	HAL_Delay(1000);
-	SPI_FLASH_BufferRead((uint8_t *) &saveData, 0, 300);
+	SPI_FLASH_BufferRead((uint8_t*) &saveData, 0, 300);
 	HAL_Delay(1000);
 //	HAL_NVIC_EnableIRQ(USART1_IRQn);
 	HAL_NVIC_EnableIRQ(USART2_IRQn);
@@ -676,8 +747,8 @@ void eepromReadSetting(void) {
 }/* End eepromReadSetting() */
 
 /**
- * @功能简介 : 将浮点数的各个位的数值转换成字符串
- * @入口参数 : data - 浮点数 | *buf - 转换结果保存位置 | 长度
+ * @功能简介 : 写入用户配置
+ * @入口参数 : 无
  * @出口参数 : 无
  * @历史版本 : V0.0.1 - Ethan - 2018/01/03
  */
@@ -690,7 +761,7 @@ void eepromWriteSetting(void) {
 	HAL_NVIC_DisableIRQ(TIM2_IRQn);
 	HAL_Delay(1000);
 	SPI_FLASH_SectorErase(0);
-	SPI_FLASH_BufferWrite((uint8_t *) &saveData, 0, 300);
+	SPI_FLASH_BufferWrite((uint8_t*) &saveData, 0, 300);
 	HAL_Delay(1000);
 	HAL_NVIC_EnableIRQ(USART1_IRQn);
 	HAL_NVIC_EnableIRQ(USART2_IRQn);
@@ -708,66 +779,83 @@ void eepromWriteSetting(void) {
  */
 void loadMainPage(void) {
 	uint8_t i, j;
-	//EE B1 12 00 01
-	//00 0F 00 01 31
-	//00 10 00 01 32
-	//00 11 00 01 33
-	//00 12 00 01 34
-	//00 13 00 01 35
-	//00 14 00 01 36
-	//00 07 00 01 37
-	//00 0A 00 01 38
-	//00 0D 00 01 39
-	//FF FC FF FF
 	uint8_t temp[100];
+	uint8_t tempColor[12];
+
 	temp[0] = 0xEE;
 	temp[1] = 0xB1;
 	temp[2] = 0x12;
 	temp[3] = 0x00;
 
+	tempColor[0] = 0xEE;
+	tempColor[1] = 0xB1;
+	tempColor[2] = 0x23;
+	tempColor[3] = 0x00;
+
+	tempColor[5] = 0x00;
+	tempColor[8] = 0xFF;
+	tempColor[9] = 0xFC;
+	tempColor[10] = 0xFF;
+	tempColor[11] = 0xFF;
+
 	//跳转主画面1-1
 	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
 			&& saveData[2].nameIndex == 0) {
 		temp[4] = PAGE_MAIN11;
+		tempColor[4] = PAGE_MAIN11;
+		mainpage = PAGE_MAIN11;
 	}
 	//跳转主画面1-2
 	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex == 0) {
 		temp[4] = PAGE_MAIN12;
+		tempColor[4] = PAGE_MAIN12;
+		mainpage = PAGE_MAIN12;
 	}
 	//跳转主画面1-3
 	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex == 0
 			&& saveData[2].nameIndex != 0) {
 		temp[4] = PAGE_MAIN13;
+		tempColor[4] = PAGE_MAIN13;
+		mainpage = PAGE_MAIN13;
 	}
 	//跳转主画面2-12
 	else if (saveData[0].nameIndex != 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex == 0) {
 		temp[4] = PAGE_MAIN212;
+		tempColor[4] = PAGE_MAIN212;
+		mainpage = PAGE_MAIN212;
 	}
 	//跳转主画面2-13
 	else if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
 			&& saveData[2].nameIndex != 0) {
 		temp[4] = PAGE_MAIN213;
+		tempColor[4] = PAGE_MAIN213;
+		mainpage = PAGE_MAIN213;
 	}
 	//跳转主画面2-23
 	else if (saveData[0].nameIndex == 0 && saveData[1].nameIndex != 0
 			&& saveData[2].nameIndex != 0) {
 		temp[4] = PAGE_MAIN223;
+		tempColor[4] = PAGE_MAIN223;
+		mainpage = PAGE_MAIN223;
 	}
 	//跳转主画面3
 	else {
 		temp[4] = 0x01;
+		tempColor[4] = 0x01;
+		mainpage = 0x01;
 	}
 	/* 通道 1 名称 */
 	temp[5] = 0x00;
 	temp[6] = 0x0F;
 	j = 7;
+
 	for (i = 0;
 			i
-					< ((enName[saveData[0].nameIndex][0] << 8)
-							+ enName[saveData[0].nameIndex][1] + 2); i++) {
-		temp[i + 7] = enName[saveData[0].nameIndex][i];
+					< ((engName[saveData[0].nameIndex][0] << 8)
+							+ engName[saveData[0].nameIndex][1] + 2); i++) {
+		temp[i + 7] = engName[saveData[0].nameIndex][i];
 		j++;
 	}
 
@@ -775,20 +863,24 @@ void loadMainPage(void) {
 	temp[j++] = 0x10;
 	for (i = 0;
 			i
-					< ((cnName[saveData[0].nameIndex][0] << 8)
-							+ cnName[saveData[0].nameIndex][1] + 2); i++) {
-		temp[i + j] = cnName[saveData[0].nameIndex][i];
+					< ((chnName[saveData[0].nameIndex][0] << 8)
+							+ chnName[saveData[0].nameIndex][1] + 2); i++) {
+		temp[i + j] = chnName[saveData[0].nameIndex][i];
 	}
 	j = j + i;
+
+	tempColor[6] = 36;
+	tempColor[7] = colorName[saveData[0].nameIndex][0];
+	HAL_UART_Transmit(&huart2, tempColor, 12, SendTime);
 
 	/* 通道 2 名称 */
 	temp[j++] = 0x00;
 	temp[j++] = 0x11;
 	for (i = 0;
 			i
-					< ((enName[saveData[1].nameIndex][0] << 8)
-							+ enName[saveData[1].nameIndex][1] + 2); i++) {
-		temp[i + j] = enName[saveData[1].nameIndex][i];
+					< ((engName[saveData[1].nameIndex][0] << 8)
+							+ engName[saveData[1].nameIndex][1] + 2); i++) {
+		temp[i + j] = engName[saveData[1].nameIndex][i];
 	}
 	j = j + i;
 
@@ -796,20 +888,24 @@ void loadMainPage(void) {
 	temp[j++] = 0x12;
 	for (i = 0;
 			i
-					< ((cnName[saveData[1].nameIndex][0] << 8)
-							+ cnName[saveData[1].nameIndex][1] + 2); i++) {
-		temp[i + j] = cnName[saveData[1].nameIndex][i];
+					< ((chnName[saveData[1].nameIndex][0] << 8)
+							+ chnName[saveData[1].nameIndex][1] + 2); i++) {
+		temp[i + j] = chnName[saveData[1].nameIndex][i];
 	}
 	j = j + i;
+
+	tempColor[6] = 37;
+	tempColor[7] = colorName[saveData[1].nameIndex][0];
+	HAL_UART_Transmit(&huart2, tempColor, 12, SendTime);
 
 	/* 通道 3 名称 */
 	temp[j++] = 0x00;
 	temp[j++] = 0x13;
 	for (i = 0;
 			i
-					< ((enName[saveData[2].nameIndex][0] << 8)
-							+ enName[saveData[2].nameIndex][1] + 2); i++) {
-		temp[i + j] = enName[saveData[2].nameIndex][i];
+					< ((engName[saveData[2].nameIndex][0] << 8)
+							+ engName[saveData[2].nameIndex][1] + 2); i++) {
+		temp[i + j] = engName[saveData[2].nameIndex][i];
 	}
 	j = j + i;
 
@@ -817,28 +913,42 @@ void loadMainPage(void) {
 	temp[j++] = 0x14;
 	for (i = 0;
 			i
-					< ((cnName[saveData[2].nameIndex][0] << 8)
-							+ cnName[saveData[2].nameIndex][1] + 2); i++) {
-		temp[i + j] = cnName[saveData[2].nameIndex][i];
+					< ((chnName[saveData[2].nameIndex][0] << 8)
+							+ chnName[saveData[2].nameIndex][1] + 2); i++) {
+		temp[i + j] = chnName[saveData[2].nameIndex][i];
 	}
 	j = j + i;
+
+	tempColor[6] = 38;
+	tempColor[7] = colorName[saveData[2].nameIndex][0];
+	HAL_UART_Transmit(&huart2, tempColor, 12, SendTime);
 
 	/* 通道 1 单位 */
 	temp[j++] = 0x00;
 	temp[j++] = 0x07;
-	//00 03 4D 50 61 单位MPa
-	if (saveData[0].rangeIndex != 3) {
-		temp[j++] = 0x00;
-		temp[j++] = 0x03;
-		temp[j++] = 0x4D;
-		temp[j++] = 0x50;
-		temp[j++] = 0x61;
-	}
 	//00 03 6B 50 61 单位kPa
-	else {
+	if (saveData[0].rangeIndex == 3) {
 		temp[j++] = 0x00;
 		temp[j++] = 0x03;
 		temp[j++] = 0x6B;
+		temp[j++] = 0x50;
+		temp[j++] = 0x61;
+	}
+	/* 00 05 4C 2F 6D 69 6E 单位L/min */
+	else if (saveData[0].rangeIndex > 3 && saveData[0].rangeIndex < 8) {
+		temp[j++] = 0x00;
+		temp[j++] = 0x05;
+		temp[j++] = 0x4C;
+		temp[j++] = 0x2F;
+		temp[j++] = 0x6D;
+		temp[j++] = 0x69;
+		temp[j++] = 0x6E;
+	}
+	//00 03 4D 50 61 单位MPa
+	else {
+		temp[j++] = 0x00;
+		temp[j++] = 0x03;
+		temp[j++] = 0x4D;
 		temp[j++] = 0x50;
 		temp[j++] = 0x61;
 	}
@@ -846,19 +956,29 @@ void loadMainPage(void) {
 	/* 通道 2 单位 */
 	temp[j++] = 0x00;
 	temp[j++] = 0x0A;
-	//00 03 4D 50 61 单位MPa
-	if (saveData[1].rangeIndex != 3) {
-		temp[j++] = 0x00;
-		temp[j++] = 0x03;
-		temp[j++] = 0x4D;
-		temp[j++] = 0x50;
-		temp[j++] = 0x61;
-	}
 	//00 03 6B 50 61 单位kPa
-	else {
+	if (saveData[1].rangeIndex == 3) {
 		temp[j++] = 0x00;
 		temp[j++] = 0x03;
 		temp[j++] = 0x6B;
+		temp[j++] = 0x50;
+		temp[j++] = 0x61;
+	}
+	/* 00 05 4C 2F 6D 69 6E 单位L/min */
+	else if (saveData[1].rangeIndex > 3 && saveData[1].rangeIndex < 8) {
+		temp[j++] = 0x00;
+		temp[j++] = 0x05;
+		temp[j++] = 0x4C;
+		temp[j++] = 0x2F;
+		temp[j++] = 0x6D;
+		temp[j++] = 0x69;
+		temp[j++] = 0x6E;
+	}
+	//00 03 4D 50 61 单位MPa
+	else {
+		temp[j++] = 0x00;
+		temp[j++] = 0x03;
+		temp[j++] = 0x4D;
 		temp[j++] = 0x50;
 		temp[j++] = 0x61;
 	}
@@ -866,19 +986,29 @@ void loadMainPage(void) {
 	/* 通道 3 单位 */
 	temp[j++] = 0x00;
 	temp[j++] = 0x0D;
-	//00 03 4D 50 61 单位MPa
-	if (saveData[2].rangeIndex != 3) {
-		temp[j++] = 0x00;
-		temp[j++] = 0x03;
-		temp[j++] = 0x4D;
-		temp[j++] = 0x50;
-		temp[j++] = 0x61;
-	}
 	//00 03 6B 50 61 单位kPa
-	else {
+	if (saveData[2].rangeIndex == 3) {
 		temp[j++] = 0x00;
 		temp[j++] = 0x03;
 		temp[j++] = 0x6B;
+		temp[j++] = 0x50;
+		temp[j++] = 0x61;
+	}
+	/* 00 05 4C 2F 6D 69 6E 单位L/min */
+	else if (saveData[2].rangeIndex > 3 && saveData[2].rangeIndex < 8) {
+		temp[j++] = 0x00;
+		temp[j++] = 0x05;
+		temp[j++] = 0x4C;
+		temp[j++] = 0x2F;
+		temp[j++] = 0x6D;
+		temp[j++] = 0x69;
+		temp[j++] = 0x6E;
+	}
+	//00 03 4D 50 61 单位MPa
+	else {
+		temp[j++] = 0x00;
+		temp[j++] = 0x03;
+		temp[j++] = 0x4D;
 		temp[j++] = 0x50;
 		temp[j++] = 0x61;
 	}
@@ -887,11 +1017,8 @@ void loadMainPage(void) {
 	temp[j++] = 0xFC;
 	temp[j++] = 0xFF;
 	temp[j++] = 0xFF;
-	HAL_UART_Transmit(&huart2, temp, j++, 0xFFFF);
 
-	LEDPOWERA((saveData[0].nameIndex != 0));
-	LEDPOWERB((saveData[1].nameIndex != 0));
-	LEDPOWERC((saveData[2].nameIndex != 0));
+	HAL_UART_Transmit(&huart2, temp, j++, SendTime);
 
 	/* rangeIndex 设置0-20ma量程 */
 	//0/1MPa | 0/1.6MPa | 0/2.5MPa | -100/300kPa
@@ -912,6 +1039,22 @@ void loadMainPage(void) {
 		case 3:
 			val_20mA[i] = 300;
 			val_4mA[i] = -100;
+			break;
+		case 4:
+			val_20mA[i] = 200;
+			val_4mA[i] = 0;
+			break;
+		case 5:
+			val_20mA[i] = 400;
+			val_4mA[i] = 0;
+			break;
+		case 6:
+			val_20mA[i] = 600;
+			val_4mA[i] = 0;
+			break;
+		case 7:
+			val_20mA[i] = 800;
+			val_4mA[i] = 0;
 			break;
 		}
 	}
@@ -935,20 +1078,44 @@ void loadMainPage(void) {
 							date_1302[5] * 10 + date_1302[4],
 							date_1302[3] * 10 + date_1302[2],
 							date_1302[1] * 10 + date_1302[0])) {
-		HAL_UART_Transmit(&huart2, licPassedCMD, 11, 0xFFFF);
+		licFailedFlag = 0;
+		HAL_UART_Transmit(&huart2, licPassedCMD, 11, SendTime);
 	} else {
-		HAL_UART_Transmit(&huart2, licFailedCMD, 19, 0xFFFF);
+		licFailedFlag = 1;
+		HAL_UART_Transmit(&huart2, licFailedCMD, 19, SendTime);
 	}
 
 	//清除密码错误提示
 	//EE B1 10 00 02 00 04 20 FF FC FF FF
 	uint8_t temp0[12] = { 0xEE, 0xB1, 0x10, 0x00, 0x02, 0x00, 0x04, 0x20, 0xFF,
 			0xFC, 0xFF, 0xFF };
-	HAL_UART_Transmit(&huart2, temp0, 12, 0xFFFF);
+	HAL_UART_Transmit(&huart2, temp0, 12, SendTime);
 	/* 设置音量 */
-	HAL_Delay(500);
-	Line_1A_WTN5(0xE0 + ((uint8_t) (saveData[0].volume * 1.5) & 0x0F)); //音量
-	HAL_Delay(500);
+//	HAL_Delay(500);
+//	Line_1A_WTN5(0xE0 + ((uint8_t) (saveData[0].volume * 1.5) & 0x0F)); //音量
+//	HAL_Delay(500);
+	/* 解除系统锁定 */
+	//EE 09 DE ED 13 31 FF FC FF FF
+	temp0[0] = 0xEE;
+	temp0[1] = 0x09;
+	temp0[2] = 0xDE;
+	temp0[3] = 0xED;
+	temp0[4] = 0x13;
+	temp0[5] = 0x31;
+	temp0[6] = 0xFC;
+	temp0[7] = 0xFF;
+	temp0[8] = 0xFF;
+	HAL_UART_Transmit(&huart2, temp0, 9, SendTime);
+	/* 设置音量 */
+	//EE 93 00 FF FC FF FF
+	temp0[0] = 0xEE;
+	temp0[1] = 0x93;
+	temp0[2] = saveData[0].volume;
+	temp0[3] = 0xFF;
+	temp0[4] = 0xFC;
+	temp0[5] = 0xFF;
+	temp0[6] = 0xFF;
+	HAL_UART_Transmit(&huart2, temp0, 7, SendTime);
 
 	set485rom(0);
 
@@ -980,27 +1147,49 @@ void loadMainPage(void) {
 		_Error_Handler(__FILE__, __LINE__);
 	}
 	/* 启动一次 DMA 接收 */
-	if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) RS485_RX_BUF, 8) != HAL_OK) {
+	if (HAL_UART_Receive_DMA(&huart3, (uint8_t*) RS485_RX_BUF, 8) != HAL_OK) {
 		Error_Handler();
 	}
 	/* 开启串口3空闲中断 */
 	__HAL_UART_ENABLE_IT(&huart3, UART_IT_IDLE);
 
+	if ((ledFlag[0] == 0 || ledFlag[0] == 3)
+			&& (ledFlag[1] == 0 || ledFlag[1] == 3)
+			&& (ledFlag[2] == 0 || ledFlag[2] == 3)) {
+		alarmFlag = 0;
+		//无报警，关闭报警继电器
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+	} else {
+		//赋值 4 便于计算音量图标帧数
+		alarmFlag = 4;
+		//有报警，打开报警继电器
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
+	}
 	//修改音量图标
-	if (muteFlag == 1) {
-		volumePicCMD[7] = 0;
+	volumePicCMD[4] = currentPage;
+	if (((muteFlag[0] == 1 || ledFlag[0] == 0)
+			&& (muteFlag[1] == 1 || ledFlag[1] == 0)
+			&& (muteFlag[2] == 1 || ledFlag[2] == 0))
+			|| saveData[0].volume == 0) {
+		volumePicCMD[7] = 0 + alarmFlag;
+		if (bebe) {
+			alarm_off();
+		}
 	} else {
 		volumePicCMD[7] = (uint8_t) (saveData[0].volume / 10);
 		if (volumePicCMD[7] <= 4) {
-			volumePicCMD[7] = 1;
+			volumePicCMD[7] = 1 + alarmFlag;
 		} else if (volumePicCMD[7] > 4 && volumePicCMD[7] <= 7) {
-			volumePicCMD[7] = 2;
+			volumePicCMD[7] = 2 + alarmFlag;
 		} else if (volumePicCMD[7] > 7) {
-			volumePicCMD[7] = 3;
+			volumePicCMD[7] = 3 + alarmFlag;
+		}
+		if (!bebe && alarmFlag != 0) {
+			alarm_on();
 		}
 	}
 	//修改音量图标
-	HAL_UART_Transmit(&huart2, volumePicCMD, 12, 0xFFFF);
+	HAL_UART_Transmit(&huart2, volumePicCMD, 12, SendTime);
 
 	//跳转主画面1-1
 	if (saveData[0].nameIndex != 0 && saveData[1].nameIndex == 0
@@ -1016,7 +1205,7 @@ void loadMainPage(void) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN11;
 	}
@@ -1034,7 +1223,7 @@ void loadMainPage(void) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN12;
 	}
@@ -1052,7 +1241,7 @@ void loadMainPage(void) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN13;
 	}
@@ -1070,7 +1259,7 @@ void loadMainPage(void) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN212;
 	}
@@ -1088,7 +1277,7 @@ void loadMainPage(void) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN213;
 	}
@@ -1106,7 +1295,7 @@ void loadMainPage(void) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN223;
 	}
@@ -1123,7 +1312,7 @@ void loadMainPage(void) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN3;
 	}
@@ -1228,28 +1417,22 @@ void factorySetting(uint8_t permisson) {
  * @历史版本 : V0.0.1 - Ethan - 2018/01/03
  */
 void selfTest(void) {
-	uint8_t temp[12];
+//	uint8_t temp[12];
 	uint8_t tempAdcASCii[5];
 	uint8_t i;
-	/* 开启运行指示灯 */
-	LEDPOWERA(1);
-	LEDPOWERB(1);
-	LEDPOWERC(1);
+
 	/* 蜂鸣器报警 */
 	alarm_on();
-	alarm_on();
-	alarm_on();
-	alarm_on();
-	alarm_on();
-//EE 61 0F FF FC FF FF
-	temp[0] = 0xEE;	//帧头
-	temp[1] = 0x61;	//命令类型(UPDATE_CONTROL)
-	temp[2] = 50;
-	temp[3] = 0xFF;	//帧尾
-	temp[4] = 0xFC;
-	temp[5] = 0xFF;
-	temp[6] = 0xFF;
-	HAL_UART_Transmit(&huart2, temp, 7, 0xFFFF);
+
+	//EE 61 0F FF FC FF FF
+//	temp[0] = 0xEE;	//帧头
+//	temp[1] = 0x61;	//命令类型(UPDATE_CONTROL)
+//	temp[2] = 50;
+//	temp[3] = 0xFF;	//帧尾
+//	temp[4] = 0xFC;
+//	temp[5] = 0xFF;
+//	temp[6] = 0xFF;
+//	HAL_UART_Transmit(&huart2, temp, 7, SendTime);
 	/* 自检欠压 */
 	/* 发送AD值和超压欠压状态 */
 // EE B1 12 00 01
@@ -1274,61 +1457,79 @@ void selfTest(void) {
 	}
 	/* 通道 1 */
 //欠压
-	multiUICMD[36] = 0xD7;
-	multiUICMD[37] = 0xD4;
-	multiUICMD[38] = 0xBC;
-	multiUICMD[39] = 0xEC;
+	multiUICMD[36] = 0x20;
+	multiUICMD[37] = 0x20;
+	multiUICMD[38] = 0x20;
+	multiUICMD[39] = 0xC7;
+	multiUICMD[40] = 0xB7;
+	multiUICMD[41] = 0xD1;
+	multiUICMD[42] = 0xB9;
+	multiUICMD[43] = 0x20;
+	multiUICMD[44] = 0x20;
+	multiUICMD[45] = 0x20;
 	statusColorCMD[0][7] = setTextRed[0];
 	statusColorCMD[0][8] = setTextRed[1];
 	numColorCMD[0][7] = setTextRed[0];
 	numColorCMD[0][8] = setTextRed[1];
-	ledFlag[0] = 0;
+	ledFlag[0] = 1;
 	/* 通道 2 */
 //欠压
-	multiUICMD[44] = 0xD7;
-	multiUICMD[45] = 0xD4;
-	multiUICMD[46] = 0xBC;
-	multiUICMD[47] = 0xEC;
+	multiUICMD[50] = 0x20;
+	multiUICMD[51] = 0x20;
+	multiUICMD[52] = 0x20;
+	multiUICMD[53] = 0xC7;
+	multiUICMD[54] = 0xB7;
+	multiUICMD[55] = 0xD1;
+	multiUICMD[56] = 0xB9;
+	multiUICMD[57] = 0x20;
+	multiUICMD[58] = 0x20;
+	multiUICMD[59] = 0x20;
 	statusColorCMD[1][7] = setTextRed[0];
 	statusColorCMD[1][8] = setTextRed[1];
 	numColorCMD[1][7] = setTextRed[0];
 	numColorCMD[1][8] = setTextRed[1];
-	ledFlag[1] = 0;
+	ledFlag[1] = 1;
 	/* 通道 3 */
 //欠压
-	multiUICMD[52] = 0xD7;
-	multiUICMD[53] = 0xD4;
-	multiUICMD[54] = 0xBC;
-	multiUICMD[55] = 0xEC;
+	multiUICMD[64] = 0x20;
+	multiUICMD[65] = 0x20;
+	multiUICMD[66] = 0x20;
+	multiUICMD[67] = 0xC7;
+	multiUICMD[68] = 0xB7;
+	multiUICMD[69] = 0xD1;
+	multiUICMD[70] = 0xB9;
+	multiUICMD[71] = 0x20;
+	multiUICMD[72] = 0x20;
+	multiUICMD[73] = 0x20;
 	statusColorCMD[2][7] = setTextRed[0];
 	statusColorCMD[2][8] = setTextRed[1];
 	numColorCMD[2][7] = setTextRed[0];
 	numColorCMD[2][8] = setTextRed[1];
-	ledFlag[2] = 0;
+	ledFlag[2] = 1;
 
 //能量柱动画帧选择显示命令
 //EE B1 23 00 01 00 02 00 FF FC FF FF
 	for (i = 0; i < 3; i++) {
 		percentPicCMD[i][7] = 0;
 	}
-	HAL_UART_Transmit(&huart2, multiUICMD, 60, 0xFFFF);
+	HAL_UART_Transmit(&huart2, multiUICMD, 78, SendTime);
 	for (i = 0; i < 3; i++) {
-		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, 0xFFFF);
-		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, 0xFFFF);
-		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, 0xFFFF);
+		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, SendTime);
+		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, SendTime);
+		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, SendTime);
 	}
 	updateLed();
 	/* 延时 1500ms*/
 	HAL_Delay(1500);
 
 //EE 61 0F FF FC FF FF
-	temp[1] = 0x61;	//命令类型(UPDATE_CONTROL)
-	temp[2] = 50;
-	temp[3] = 0xFF;	//帧尾
-	temp[4] = 0xFC;
-	temp[5] = 0xFF;
-	temp[6] = 0xFF;
-	HAL_UART_Transmit(&huart2, temp, 7, 0xFFFF);
+//	temp[1] = 0x61;	//命令类型(UPDATE_CONTROL)
+//	temp[2] = 50;
+//	temp[3] = 0xFF;	//帧尾
+//	temp[4] = 0xFC;
+//	temp[5] = 0xFF;
+//	temp[6] = 0xFF;
+//	HAL_UART_Transmit(&huart2, temp, 7, SendTime);
 	/* 自检欠压 */
 	/* 发送AD值和超压欠压状态 */
 // EE B1 12 00 01
@@ -1353,10 +1554,16 @@ void selfTest(void) {
 	}
 	/* 通道 1 */
 //超压
-	multiUICMD[36] = 0xD7;
-	multiUICMD[37] = 0xD4;
-	multiUICMD[38] = 0xBC;
-	multiUICMD[39] = 0xEC;
+	multiUICMD[36] = 0x20;
+	multiUICMD[37] = 0x20;
+	multiUICMD[38] = 0x20;
+	multiUICMD[39] = 0xB3;
+	multiUICMD[40] = 0xAC;
+	multiUICMD[41] = 0xD1;
+	multiUICMD[42] = 0xB9;
+	multiUICMD[43] = 0x20;
+	multiUICMD[44] = 0x20;
+	multiUICMD[45] = 0x20;
 	statusColorCMD[0][7] = setTextRed[0];
 	statusColorCMD[0][8] = setTextRed[1];
 	numColorCMD[0][7] = setTextRed[0];
@@ -1364,10 +1571,16 @@ void selfTest(void) {
 	ledFlag[0] = 2;
 	/* 通道 2 */
 //超压
-	multiUICMD[44] = 0xD7;
-	multiUICMD[45] = 0xD4;
-	multiUICMD[46] = 0xBC;
-	multiUICMD[47] = 0xEC;
+	multiUICMD[50] = 0x20;
+	multiUICMD[51] = 0x20;
+	multiUICMD[52] = 0x20;
+	multiUICMD[53] = 0xB3;
+	multiUICMD[54] = 0xAC;
+	multiUICMD[55] = 0xD1;
+	multiUICMD[56] = 0xB9;
+	multiUICMD[57] = 0x20;
+	multiUICMD[58] = 0x20;
+	multiUICMD[59] = 0x20;
 	statusColorCMD[1][7] = setTextRed[0];
 	statusColorCMD[1][8] = setTextRed[1];
 	numColorCMD[1][7] = setTextRed[0];
@@ -1376,10 +1589,16 @@ void selfTest(void) {
 
 	/* 通道 3 */
 //超压
-	multiUICMD[52] = 0xD7;
-	multiUICMD[53] = 0xD4;
-	multiUICMD[54] = 0xBC;
-	multiUICMD[55] = 0xEC;
+	multiUICMD[64] = 0x20;
+	multiUICMD[65] = 0x20;
+	multiUICMD[66] = 0x20;
+	multiUICMD[67] = 0xB3;
+	multiUICMD[68] = 0xAC;
+	multiUICMD[69] = 0xD1;
+	multiUICMD[70] = 0xB9;
+	multiUICMD[71] = 0x20;
+	multiUICMD[72] = 0x20;
+	multiUICMD[73] = 0x20;
 	statusColorCMD[2][7] = setTextRed[0];
 	statusColorCMD[2][8] = setTextRed[1];
 	numColorCMD[2][7] = setTextRed[0];
@@ -1391,11 +1610,11 @@ void selfTest(void) {
 	for (i = 0; i < 3; i++) {
 		percentPicCMD[i][7] = 9;
 	}
-	HAL_UART_Transmit(&huart2, multiUICMD, 60, 0xFFFF);
+	HAL_UART_Transmit(&huart2, multiUICMD, 78, SendTime);
 	for (i = 0; i < 3; i++) {
-		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, 0xFFFF);
-		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, 0xFFFF);
-		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, 0xFFFF);
+		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, SendTime);
+		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, SendTime);
+		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, SendTime);
 	}
 	updateLed();
 	/* 延时 1500ms*/
@@ -1403,13 +1622,13 @@ void selfTest(void) {
 
 	/* 蜂鸣器报警 */
 //EE 61 0F FF FC FF FF
-	temp[1] = 0x61;	//命令类型(UPDATE_CONTROL)
-	temp[2] = 50;
-	temp[3] = 0xFF;	//帧尾
-	temp[4] = 0xFC;
-	temp[5] = 0xFF;
-	temp[6] = 0xFF;
-	HAL_UART_Transmit(&huart2, temp, 7, 0xFFFF);
+//	temp[1] = 0x61;	//命令类型(UPDATE_CONTROL)
+//	temp[2] = 50;
+//	temp[3] = 0xFF;	//帧尾
+//	temp[4] = 0xFC;
+//	temp[5] = 0xFF;
+//	temp[6] = 0xFF;
+//	HAL_UART_Transmit(&huart2, temp, 7, SendTime);
 	/* 自检欠压 */
 	/* 发送AD值和超压欠压状态 */
 // EE B1 12 00 01
@@ -1434,60 +1653,83 @@ void selfTest(void) {
 	}
 	/* 通道 1 */
 //正常
-	multiUICMD[36] = 0xD7;
-	multiUICMD[37] = 0xD4;
-	multiUICMD[38] = 0xBC;
-	multiUICMD[39] = 0xEC;
+	multiUICMD[36] = 0x20;
+	multiUICMD[37] = 0x20;
+	multiUICMD[38] = 0x20;
+	multiUICMD[39] = 0xD5;
+	multiUICMD[40] = 0xFD;
+	multiUICMD[41] = 0xB3;
+	multiUICMD[42] = 0xA3;
+	multiUICMD[43] = 0x20;
+	multiUICMD[44] = 0x20;
+	multiUICMD[45] = 0x20;
 	statusColorCMD[0][7] = setTextGreen[0];
 	statusColorCMD[0][8] = setTextGreen[1];
 	numColorCMD[0][7] = setTextGreen[0];
 	numColorCMD[0][8] = setTextGreen[1];
-	ledFlag[0] = 1;
+	ledFlag[0] = 0;
 	/* 通道 2 */
 //正常
-	multiUICMD[44] = 0xD7;
-	multiUICMD[45] = 0xD4;
-	multiUICMD[46] = 0xBC;
-	multiUICMD[47] = 0xEC;
+	multiUICMD[50] = 0x20;
+	multiUICMD[51] = 0x20;
+	multiUICMD[52] = 0x20;
+	multiUICMD[53] = 0xD5;
+	multiUICMD[54] = 0xFD;
+	multiUICMD[55] = 0xB3;
+	multiUICMD[56] = 0xA3;
+	multiUICMD[57] = 0x20;
+	multiUICMD[58] = 0x20;
+	multiUICMD[59] = 0x20;
 	statusColorCMD[1][7] = setTextGreen[0];
 	statusColorCMD[1][8] = setTextGreen[1];
 	numColorCMD[1][7] = setTextGreen[0];
 	numColorCMD[1][8] = setTextGreen[1];
-	ledFlag[1] = 1;
+	ledFlag[1] = 0;
 
 	/* 通道 3 */
 //正常
-	multiUICMD[52] = 0xD7;
-	multiUICMD[53] = 0xD4;
-	multiUICMD[54] = 0xBC;
-	multiUICMD[55] = 0xEC;
+	multiUICMD[64] = 0x20;
+	multiUICMD[65] = 0x20;
+	multiUICMD[66] = 0x20;
+	multiUICMD[67] = 0xD5;
+	multiUICMD[68] = 0xFD;
+	multiUICMD[69] = 0xB3;
+	multiUICMD[70] = 0xA3;
+	multiUICMD[71] = 0x20;
+	multiUICMD[72] = 0x20;
+	multiUICMD[73] = 0x20;
 	statusColorCMD[2][7] = setTextGreen[0];
 	statusColorCMD[2][8] = setTextGreen[1];
 	numColorCMD[2][7] = setTextGreen[0];
 	numColorCMD[2][8] = setTextGreen[1];
-	ledFlag[2] = 1;
+	ledFlag[2] = 0;
 
 //能量柱动画帧选择显示命令
 //EE B1 23 00 01 00 02 00 FF FC FF FF
 	for (i = 0; i < 3; i++) {
 		percentPicCMD[i][7] = 5;
 	}
-	HAL_UART_Transmit(&huart2, multiUICMD, 60, 0xFFFF);
+	HAL_UART_Transmit(&huart2, multiUICMD, 78, SendTime);
 	for (i = 0; i < 3; i++) {
-		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, 0xFFFF);
-		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, 0xFFFF);
-		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, 0xFFFF);
+		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, SendTime);
+		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, SendTime);
+		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, SendTime);
 	}
 	updateLed();
 	timeStamp = currentTime;
 	/* 延时 3000ms*/
-	HAL_Delay(5000);
+	HAL_Delay(3000);
 
 	timeStamp = 0;
 
+	alarm_off();
+
+	ledFlag[0] = rom485[37];
+	ledFlag[1] = rom485[57];
+	ledFlag[2] = rom485[77];
+
 	/* 加载主界面设置 */
 	loadMainPage();
-	alarm_off();
 	testFlag = 0;
 }
 
@@ -1498,56 +1740,55 @@ void selfTest(void) {
  * @历史版本 : V0.0.1 - Ethan - 2018/01/03
  */
 void updateADC(void) {
-	int i = 0, lcd_number_j = 0;
+	int i = 0, CHN_NUM = 0;
 	float aaa;
 
-	for (lcd_number_j = 0; lcd_number_j < 3; lcd_number_j++) {
-		adcTemp[lcd_number_j][adc_index[lcd_number_j]] =
-				ADC_ConvertedValue[lcd_number_j];
-		if (adc_index[lcd_number_j] >= 16)
-			adc_index[lcd_number_j] = 0;
-		adc_index[lcd_number_j]++;
-		if (adc_count[lcd_number_j] < 16)
-			adc_count[lcd_number_j]++;
+	for (CHN_NUM = 0; CHN_NUM < 3; CHN_NUM++) {
+		/*TODO 电路图画反了，这里CHN_NUM反向*/
+		adcTemp[CHN_NUM][adc_index[CHN_NUM]] = ADC_ConvertedValue[2 - CHN_NUM];
+		if (adc_index[CHN_NUM] >= 16)
+			adc_index[CHN_NUM] = 0;
+		adc_index[CHN_NUM]++;
+		if (adc_count[CHN_NUM] < 16)
+			adc_count[CHN_NUM]++;
 
-		g_adc_Temp_filter[lcd_number_j] = 0;
-		for (i = 1; i < adc_count[lcd_number_j] + 1; i++) {
-			g_adc_Temp_filter[lcd_number_j] += adcTemp[lcd_number_j][i];
+		g_adc_Temp_filter[CHN_NUM] = 0;
+		for (i = 1; i < adc_count[CHN_NUM] + 1; i++) {
+			g_adc_Temp_filter[CHN_NUM] += adcTemp[CHN_NUM][i];
 		}
 
-		if (lcd_number_j == 0) {
+		if (CHN_NUM == 0) {
 			gg_adc_Temp_filter[0] = g_adc_Temp_filter[0] >> 4;
-		} else if (lcd_number_j == 1) {
+		} else if (CHN_NUM == 1) {
 			gg_adc_Temp_filter[1] = g_adc_Temp_filter[1] >> 4;
-		} else if (lcd_number_j == 2) {
+		} else if (CHN_NUM == 2) {
 			gg_adc_Temp_filter[2] = g_adc_Temp_filter[2] >> 4;
 		}
 		// 编写AD转换后输出的压力数字
 
-		adc_Temp_filter[lcd_number_j] = (gg_adc_Temp_filter[lcd_number_j] + 35
-				+ saveData[lcd_number_j].zero)
-				* (0.990 + saveData[lcd_number_j].K / 1000.0); //*1.0085+30;	//3屏幕	  01 芯片电压3.31
-		if ((adc_Temp_filter[lcd_number_j] < 0))
+		adc_Temp_filter[CHN_NUM] = (gg_adc_Temp_filter[CHN_NUM] + 35
+				+ saveData[CHN_NUM].zero)
+				* (0.990 + saveData[CHN_NUM].K / 1000.0); //*1.0085+30;	//3屏幕	  01 芯片电压3.31
+		if ((adc_Temp_filter[CHN_NUM] < 0))
 
-			adc_Temp_filter[lcd_number_j] = 0;
-		else if (adc_Temp_filter[lcd_number_j] >= 4096)
-			adc_Temp_filter[lcd_number_j] = 4095;
-		if (adc_Temp_filter[lcd_number_j] < 558)	 //采集值小于了0.45V
+			adc_Temp_filter[CHN_NUM] = 0;
+		else if (adc_Temp_filter[CHN_NUM] >= 4096)
+			adc_Temp_filter[CHN_NUM] = 4095;
+		if (adc_Temp_filter[CHN_NUM] < 558)	 //采集值小于了0.45V
 				{
-			float_ADCValue[lcd_number_j] = 0;
+			float_ADCValue[CHN_NUM] = 0;
 		} else {
-			if (val_20mA[lcd_number_j] < val_4mA[lcd_number_j]) {
-				aaa = val_4mA[lcd_number_j];
-				val_4mA[lcd_number_j] = val_20mA[lcd_number_j];
-				val_20mA[lcd_number_j] = aaa;
+			if (val_20mA[CHN_NUM] < val_4mA[CHN_NUM]) {
+				aaa = val_4mA[CHN_NUM];
+				val_4mA[CHN_NUM] = val_20mA[CHN_NUM];
+				val_20mA[CHN_NUM] = aaa;
 			}
 			// y=kx+b
-			k[lcd_number_j] = (val_20mA[lcd_number_j] - val_4mA[lcd_number_j])
+			k[CHN_NUM] = (val_20mA[CHN_NUM] - val_4mA[CHN_NUM])
 					/ (AD_VAL_WHEN_20MA - AD_VAL_WHEN_4MA);
-			b[lcd_number_j] = val_20mA[lcd_number_j]
-					- AD_VAL_WHEN_20MA * k[lcd_number_j];
-			float_ADCValue[lcd_number_j] = (adc_Temp_filter[lcd_number_j])
-					* k[lcd_number_j] + b[lcd_number_j];
+			b[CHN_NUM] = val_20mA[CHN_NUM] - AD_VAL_WHEN_20MA * k[CHN_NUM];
+			float_ADCValue[CHN_NUM] = (adc_Temp_filter[CHN_NUM]) * k[CHN_NUM]
+					+ b[CHN_NUM];
 		}
 	}  //for
 }
@@ -1559,7 +1800,9 @@ void updateADC(void) {
  * @历史版本 : V0.0.1 - Ethan - 2018/01/03
  */
 void updateUI(void) {
+	/* ADC ASCii码数组定义 */
 	uint8_t tempAdcASCii[5];
+
 	uint8_t i;
 	/* 发送AD值和超压欠压状态 */
 	// EE B1 12 00 01
@@ -1571,28 +1814,29 @@ void updateUI(void) {
 	// 00 0E 00 04 C7 B7 D1 B9	  状态3
 	// FF FC FF FF
 	multiUICMD[4] = currentPage;
+
 	for (i = 0; i < 3; i++) {
 		statusColorCMD[i][4] = currentPage;
 		numColorCMD[i][4] = currentPage;
 		percentPicCMD[i][4] = currentPage;
 	}
-	for (i = 0; i < 3; i++) {
-		if (saveData[i].nameIndex == 0) {
-			float_ADCValue[i] = 0;
-		}
-	}
-	if (float_ADCValue[0] < 0) {
-		multiUICMD[6] = 6;
-	} else
-		multiUICMD[6] = 26;
-	if (float_ADCValue[1] < 0) {
-		multiUICMD[15] = 9;
-	} else
-		multiUICMD[15] = 27;
-	if (float_ADCValue[2] < 0) {
-		multiUICMD[24] = 12;
-	} else
-		multiUICMD[24] = 28;
+//	for (i = 0; i < 3; i++) {
+//		if (saveData[i].nameIndex == 0) {
+//			float_ADCValue[i] = 0;
+//		}
+//	}
+//	if (float_ADCValue[0] < 0) {
+//		multiUICMD[6] = 6;
+//	} else
+//		multiUICMD[6] = 26;
+//	if (float_ADCValue[1] < 0) {
+//		multiUICMD[15] = 9;
+//	} else
+//		multiUICMD[15] = 27;
+//	if (float_ADCValue[2] < 0) {
+//		multiUICMD[24] = 12;
+//	} else
+//		multiUICMD[24] = 28;
 	FloatToStr5(float_ADCValue[0], tempAdcASCii, 5);
 	for (i = 0; i < 5; i++) {
 		multiUICMD[i + 9] = tempAdcASCii[i];
@@ -1605,207 +1849,620 @@ void updateUI(void) {
 	for (i = 0; i < 5; i++) {
 		multiUICMD[i + 27] = tempAdcASCii[i];
 	}
+	/* 累计流量 */
+	/* EE B1 10 00 01 00 5A 20 C0 DB BC C6 C1 F7 C1 BF A3 BA 20 20 20 20 20 20 20 30 30 38 39 31 32 20 6D 33 FF FC FF FF  */
+	uint8_t totalTemp1[48] = { 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x5A, 0x20,
+			0xC0, 0xDB, 0xBC, 0xC6, 0xC1, 0xF7, 0xC1, 0xBF, 0xA3, 0xBA, 0x20,
+			0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
+			0x20, 0x20, 0x20, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x20, 0x6D,
+			0x33, 0xFF, 0xFC, 0xFF, 0xFF };
+	uint8_t totalTemp2[12] = { 0xEE, 0xB1, 0x10, 0x00, 0x01, 0x00, 0x5A, 0x20,
+			0xFF, 0xFC, 0xFF, 0xFF };
+	totalTemp1[4] = currentPage;
+	totalTemp2[4] = currentPage;
+	for (i = 0; i < 3; i++) {
+
+		if (saveData[i].rangeIndex > 3 && saveData[i].rangeIndex < 8) {
+			totalTemp1[6] = 90 + i;
+			//Todo 更新累计流量
+			HAL_UART_Transmit(&huart2, totalTemp1, 48, SendTime);
+		} else {
+			totalTemp2[6] = 90 + i;
+			HAL_UART_Transmit(&huart2, totalTemp2, 12, SendTime);
+		}
+	}
+
+	/* 自检 */
+	if (timeStamp == SELFTESTTIME || testFlag == 1) {
+		selfTest();
+	}
+
 	/* 通道 1 */
 	//正常
-	if ((float_ADCValue[0] > saveData[0].lower_limit)
-			&& (float_ADCValue[0] < saveData[0].upper_limit)
-			&& saveData[0].nameIndex != 0) {
-		multiUICMD[36] = 0xD5;
-		multiUICMD[37] = 0xFD;
-		multiUICMD[38] = 0xB3;
-		multiUICMD[39] = 0xA3;
-		statusColorCMD[0][7] = setTextGreen[0];
-		statusColorCMD[0][8] = setTextGreen[1];
-		numColorCMD[0][7] = setTextGreen[0];
-		numColorCMD[0][8] = setTextGreen[1];
-		ledFlag[0] = 1;
+	if (saveData[0].rangeIndex != 3) {
+		if ((float_ADCValue[0] > saveData[0].lower_limit)
+				&& (float_ADCValue[0] < saveData[0].upper_limit)
+				&& saveData[0].nameIndex != 0 && adc_Temp_filter[0] >= 558) {
+			multiUICMD[36] = 0x20;
+			multiUICMD[37] = 0x20;
+			multiUICMD[38] = 0x20;
+			multiUICMD[39] = 0xD5;
+			multiUICMD[40] = 0xFD;
+			multiUICMD[41] = 0xB3;
+			multiUICMD[42] = 0xA3;
+			multiUICMD[43] = 0x20;
+			multiUICMD[44] = 0x20;
+			multiUICMD[45] = 0x20;
+			statusColorCMD[0][7] = setTextGreen[0];
+			statusColorCMD[0][8] = setTextGreen[1];
+			numColorCMD[0][7] = setTextGreen[0];
+			numColorCMD[0][8] = setTextGreen[1];
+			ledFlag[0] = 0;
+		}
+		//欠压
+		if (float_ADCValue[0] <= saveData[0].lower_limit
+				&& adc_Temp_filter[0] >= 558 && saveData[0].nameIndex != 0) {
+			multiUICMD[36] = 0x20;
+			multiUICMD[37] = 0x20;
+			multiUICMD[38] = 0x20;
+			multiUICMD[39] = 0xC7;
+			multiUICMD[40] = 0xB7;
+			multiUICMD[41] = 0xD1;
+			multiUICMD[42] = 0xB9;
+			multiUICMD[43] = 0x20;
+			multiUICMD[44] = 0x20;
+			multiUICMD[45] = 0x20;
+			statusColorCMD[0][7] = setTextRed[0];
+			statusColorCMD[0][8] = setTextRed[1];
+			numColorCMD[0][7] = setTextRed[0];
+			numColorCMD[0][8] = setTextRed[1];
+			ledFlag[0] = 1;
+			if (rom485[37] != 0x01) {
+				muteFlag[0] = 0;
+			}
+		}
+		//超压
+		if (float_ADCValue[0] >= saveData[0].upper_limit
+				&& saveData[0].nameIndex != 0 && adc_Temp_filter[0] >= 558) {
+			multiUICMD[36] = 0x20;
+			multiUICMD[37] = 0x20;
+			multiUICMD[38] = 0x20;
+			multiUICMD[39] = 0xB3;
+			multiUICMD[40] = 0xAC;
+			multiUICMD[41] = 0xD1;
+			multiUICMD[42] = 0xB9;
+			multiUICMD[43] = 0x20;
+			multiUICMD[44] = 0x20;
+			multiUICMD[45] = 0x20;
+			statusColorCMD[0][7] = setTextRed[0];
+			statusColorCMD[0][8] = setTextRed[1];
+			numColorCMD[0][7] = setTextRed[0];
+			numColorCMD[0][8] = setTextRed[1];
+			ledFlag[0] = 2;
+			if (rom485[37] != 0x02) {
+				muteFlag[0] = 0;
+			}
+		}
+	} else {
+		if ((float_ADCValue[0] > saveData[0].upper_limit)
+				&& (float_ADCValue[0] < saveData[0].lower_limit)
+				&& saveData[0].nameIndex != 0 && adc_Temp_filter[0] >= 558) {
+			multiUICMD[36] = 0x20;
+			multiUICMD[37] = 0x20;
+			multiUICMD[38] = 0x20;
+			multiUICMD[39] = 0xD5;
+			multiUICMD[40] = 0xFD;
+			multiUICMD[41] = 0xB3;
+			multiUICMD[42] = 0xA3;
+			multiUICMD[43] = 0x20;
+			multiUICMD[44] = 0x20;
+			multiUICMD[45] = 0x20;
+			statusColorCMD[0][7] = setTextGreen[0];
+			statusColorCMD[0][8] = setTextGreen[1];
+			numColorCMD[0][7] = setTextGreen[0];
+			numColorCMD[0][8] = setTextGreen[1];
+			ledFlag[0] = 0;
+		}
+		//欠压
+		if (float_ADCValue[0] >= saveData[0].lower_limit
+				&& adc_Temp_filter[0] >= 558 && saveData[0].nameIndex != 0) {
+			multiUICMD[36] = 0x20;
+			multiUICMD[37] = 0x20;
+			multiUICMD[38] = 0x20;
+			multiUICMD[39] = 0xC7;
+			multiUICMD[40] = 0xB7;
+			multiUICMD[41] = 0xD1;
+			multiUICMD[42] = 0xB9;
+			multiUICMD[43] = 0x20;
+			multiUICMD[44] = 0x20;
+			multiUICMD[45] = 0x20;
+			statusColorCMD[0][7] = setTextRed[0];
+			statusColorCMD[0][8] = setTextRed[1];
+			numColorCMD[0][7] = setTextRed[0];
+			numColorCMD[0][8] = setTextRed[1];
+			ledFlag[0] = 1;
+			if (rom485[37] != 0x01) {
+				muteFlag[0] = 0;
+			}
+		}
+		//超压
+		if (float_ADCValue[0] <= saveData[0].upper_limit
+				&& saveData[0].nameIndex != 0 && adc_Temp_filter[0] >= 558) {
+			multiUICMD[36] = 0x20;
+			multiUICMD[37] = 0x20;
+			multiUICMD[38] = 0x20;
+			multiUICMD[39] = 0xB3;
+			multiUICMD[40] = 0xAC;
+			multiUICMD[41] = 0xD1;
+			multiUICMD[42] = 0xB9;
+			multiUICMD[43] = 0x20;
+			multiUICMD[44] = 0x20;
+			multiUICMD[45] = 0x20;
+			statusColorCMD[0][7] = setTextRed[0];
+			statusColorCMD[0][8] = setTextRed[1];
+			numColorCMD[0][7] = setTextRed[0];
+			numColorCMD[0][8] = setTextRed[1];
+			ledFlag[0] = 2;
+			if (rom485[37] != 0x02) {
+				muteFlag[0] = 0;
+			}
+		}
 	}
-	//欠压
-	if (float_ADCValue[0] <= saveData[0].lower_limit
-			&& saveData[0].nameIndex != 0) {
-		multiUICMD[36] = 0xC7;
-		multiUICMD[37] = 0xB7;
-		multiUICMD[38] = 0xD1;
-		multiUICMD[39] = 0xB9;
+	//无信号输入
+	if (adc_Temp_filter[0] < 558 && saveData[0].nameIndex != 0) {
+		multiUICMD[36] = 0xCE;
+		multiUICMD[37] = 0xDE;
+		multiUICMD[38] = 0xD0;
+		multiUICMD[39] = 0xC5;
+		multiUICMD[40] = 0xBA;
+		multiUICMD[41] = 0xC5;
+		multiUICMD[42] = 0xCA;
+		multiUICMD[43] = 0xE4;
+		multiUICMD[44] = 0xC8;
+		multiUICMD[45] = 0xEB;
 		statusColorCMD[0][7] = setTextRed[0];
 		statusColorCMD[0][8] = setTextRed[1];
 		numColorCMD[0][7] = setTextRed[0];
 		numColorCMD[0][8] = setTextRed[1];
-		ledFlag[0] = 0;
-	}
-	//超压
-	if (float_ADCValue[0] >= saveData[0].upper_limit
-			&& saveData[0].nameIndex != 0) {
-		multiUICMD[36] = 0xB3;
-		multiUICMD[37] = 0xAC;
-		multiUICMD[38] = 0xD1;
-		multiUICMD[39] = 0xB9;
-		statusColorCMD[0][7] = setTextRed[0];
-		statusColorCMD[0][8] = setTextRed[1];
-		numColorCMD[0][7] = setTextRed[0];
-		numColorCMD[0][8] = setTextRed[1];
-		ledFlag[0] = 2;
+		ledFlag[0] = 4;
+		if (rom485[37] != 0x04) {
+			muteFlag[0] = 0;
+		}
 	}
 	//未使用
 	if (saveData[0].nameIndex == 0) {
 		multiUICMD[36] = 0x20;
 		multiUICMD[37] = 0x20;
-		multiUICMD[38] = 0x20;
-		multiUICMD[39] = 0x20;
+		multiUICMD[38] = 0xCE;
+		multiUICMD[39] = 0xB4;
+		multiUICMD[40] = 0xCA;
+		multiUICMD[41] = 0xB9;
+		multiUICMD[42] = 0xD3;
+		multiUICMD[43] = 0xC3;
+		multiUICMD[44] = 0x20;
+		multiUICMD[45] = 0x20;
 		statusColorCMD[0][7] = setTextGreen[0];
 		statusColorCMD[0][8] = setTextGreen[1];
 		numColorCMD[0][7] = setTextGreen[0];
 		numColorCMD[0][8] = setTextGreen[1];
 		ledFlag[0] = 3;
 	}
+	/* 自检 */
+	if (timeStamp == SELFTESTTIME || testFlag == 1) {
+		selfTest();
+	}
 	/* 通道 2 */
-	//正常
-	if ((float_ADCValue[1] > saveData[1].lower_limit)
-			&& (float_ADCValue[1] < saveData[1].upper_limit)
-			&& saveData[1].nameIndex != 0) {
-		multiUICMD[44] = 0xD5;
-		multiUICMD[45] = 0xFD;
-		multiUICMD[46] = 0xB3;
-		multiUICMD[47] = 0xA3;
-		statusColorCMD[1][7] = setTextGreen[0];
-		statusColorCMD[1][8] = setTextGreen[1];
-		numColorCMD[1][7] = setTextGreen[0];
-		numColorCMD[1][8] = setTextGreen[1];
-		ledFlag[1] = 1;
+	if (saveData[1].rangeIndex != 3) {
+		//正常
+		if ((float_ADCValue[1] > saveData[1].lower_limit)
+				&& (float_ADCValue[1] < saveData[1].upper_limit)
+				&& saveData[1].nameIndex != 0 && adc_Temp_filter[1] >= 558) {
+			multiUICMD[50] = 0x20;
+			multiUICMD[51] = 0x20;
+			multiUICMD[52] = 0x20;
+			multiUICMD[53] = 0xD5;
+			multiUICMD[54] = 0xFD;
+			multiUICMD[55] = 0xB3;
+			multiUICMD[56] = 0xA3;
+			multiUICMD[57] = 0x20;
+			multiUICMD[58] = 0x20;
+			multiUICMD[59] = 0x20;
+
+			statusColorCMD[1][7] = setTextGreen[0];
+			statusColorCMD[1][8] = setTextGreen[1];
+			numColorCMD[1][7] = setTextGreen[0];
+			numColorCMD[1][8] = setTextGreen[1];
+			ledFlag[1] = 0;
+		}
+		//欠压
+		if (float_ADCValue[1] <= saveData[1].lower_limit
+				&& adc_Temp_filter[1] >= 558 && saveData[1].nameIndex != 0) {
+			multiUICMD[50] = 0x20;
+			multiUICMD[51] = 0x20;
+			multiUICMD[52] = 0x20;
+			multiUICMD[53] = 0xC7;
+			multiUICMD[54] = 0xB7;
+			multiUICMD[55] = 0xD1;
+			multiUICMD[56] = 0xB9;
+			multiUICMD[57] = 0x20;
+			multiUICMD[58] = 0x20;
+			multiUICMD[59] = 0x20;
+			statusColorCMD[1][7] = setTextRed[0];
+			statusColorCMD[1][8] = setTextRed[1];
+			numColorCMD[1][7] = setTextRed[0];
+			numColorCMD[1][8] = setTextRed[1];
+			ledFlag[1] = 1;
+			if (rom485[57] != 0x01) {
+				muteFlag[1] = 0;
+			}
+		}
+		//超压
+		if (float_ADCValue[1] >= saveData[1].upper_limit
+				&& saveData[1].nameIndex != 0 && adc_Temp_filter[1] >= 558) {
+			multiUICMD[50] = 0x20;
+			multiUICMD[51] = 0x20;
+			multiUICMD[52] = 0x20;
+			multiUICMD[53] = 0xB3;
+			multiUICMD[54] = 0xAC;
+			multiUICMD[55] = 0xD1;
+			multiUICMD[56] = 0xB9;
+			multiUICMD[57] = 0x20;
+			multiUICMD[58] = 0x20;
+			multiUICMD[59] = 0x20;
+			statusColorCMD[1][7] = setTextRed[0];
+			statusColorCMD[1][8] = setTextRed[1];
+			numColorCMD[1][7] = setTextRed[0];
+			numColorCMD[1][8] = setTextRed[1];
+			ledFlag[1] = 2;
+			if (rom485[57] != 0x02) {
+				muteFlag[1] = 0;
+			}
+		}
+	} else {
+		//正常
+		if ((float_ADCValue[1] > saveData[1].upper_limit)
+				&& (float_ADCValue[1] < saveData[1].lower_limit)
+				&& saveData[1].nameIndex != 0 && adc_Temp_filter[1] >= 558) {
+			multiUICMD[50] = 0x20;
+			multiUICMD[51] = 0x20;
+			multiUICMD[52] = 0x20;
+			multiUICMD[53] = 0xD5;
+			multiUICMD[54] = 0xFD;
+			multiUICMD[55] = 0xB3;
+			multiUICMD[56] = 0xA3;
+			multiUICMD[57] = 0x20;
+			multiUICMD[58] = 0x20;
+			multiUICMD[59] = 0x20;
+
+			statusColorCMD[1][7] = setTextGreen[0];
+			statusColorCMD[1][8] = setTextGreen[1];
+			numColorCMD[1][7] = setTextGreen[0];
+			numColorCMD[1][8] = setTextGreen[1];
+			ledFlag[1] = 0;
+		}
+		//欠压
+		if (float_ADCValue[1] >= saveData[1].lower_limit
+				&& adc_Temp_filter[1] >= 558 && saveData[1].nameIndex != 0) {
+			multiUICMD[50] = 0x20;
+			multiUICMD[51] = 0x20;
+			multiUICMD[52] = 0x20;
+			multiUICMD[53] = 0xC7;
+			multiUICMD[54] = 0xB7;
+			multiUICMD[55] = 0xD1;
+			multiUICMD[56] = 0xB9;
+			multiUICMD[57] = 0x20;
+			multiUICMD[58] = 0x20;
+			multiUICMD[59] = 0x20;
+			statusColorCMD[1][7] = setTextRed[0];
+			statusColorCMD[1][8] = setTextRed[1];
+			numColorCMD[1][7] = setTextRed[0];
+			numColorCMD[1][8] = setTextRed[1];
+			ledFlag[1] = 1;
+			if (rom485[57] != 0x01) {
+				muteFlag[1] = 0;
+			}
+		}
+		//超压
+		if (float_ADCValue[1] <= saveData[1].upper_limit
+				&& saveData[1].nameIndex != 0 && adc_Temp_filter[1] >= 558) {
+			multiUICMD[50] = 0x20;
+			multiUICMD[51] = 0x20;
+			multiUICMD[52] = 0x20;
+			multiUICMD[53] = 0xB3;
+			multiUICMD[54] = 0xAC;
+			multiUICMD[55] = 0xD1;
+			multiUICMD[56] = 0xB9;
+			multiUICMD[57] = 0x20;
+			multiUICMD[58] = 0x20;
+			multiUICMD[59] = 0x20;
+			statusColorCMD[1][7] = setTextRed[0];
+			statusColorCMD[1][8] = setTextRed[1];
+			numColorCMD[1][7] = setTextRed[0];
+			numColorCMD[1][8] = setTextRed[1];
+			ledFlag[1] = 2;
+			if (rom485[57] != 0x02) {
+				muteFlag[1] = 0;
+			}
+		}
 	}
-	//欠压
-	if (float_ADCValue[1] <= saveData[1].lower_limit
-			&& saveData[1].nameIndex != 0) {
-		multiUICMD[44] = 0xC7;
-		multiUICMD[45] = 0xB7;
-		multiUICMD[46] = 0xD1;
-		multiUICMD[47] = 0xB9;
+	//无信号输入
+	if (adc_Temp_filter[1] < 558 && saveData[1].nameIndex != 0) {
+		multiUICMD[50] = 0xCE;
+		multiUICMD[51] = 0xDE;
+		multiUICMD[52] = 0xD0;
+		multiUICMD[53] = 0xC5;
+		multiUICMD[54] = 0xBA;
+		multiUICMD[55] = 0xC5;
+		multiUICMD[56] = 0xCA;
+		multiUICMD[57] = 0xE4;
+		multiUICMD[58] = 0xC8;
+		multiUICMD[59] = 0xEB;
 		statusColorCMD[1][7] = setTextRed[0];
 		statusColorCMD[1][8] = setTextRed[1];
 		numColorCMD[1][7] = setTextRed[0];
 		numColorCMD[1][8] = setTextRed[1];
-		ledFlag[1] = 0;
-	}
-	//超压
-	if (float_ADCValue[1] >= saveData[1].upper_limit
-			&& saveData[1].nameIndex != 0) {
-		multiUICMD[44] = 0xB3;
-		multiUICMD[45] = 0xAC;
-		multiUICMD[46] = 0xD1;
-		multiUICMD[47] = 0xB9;
-		statusColorCMD[1][7] = setTextRed[0];
-		statusColorCMD[1][8] = setTextRed[1];
-		numColorCMD[1][7] = setTextRed[0];
-		numColorCMD[1][8] = setTextRed[1];
-		ledFlag[1] = 2;
+		ledFlag[1] = 4;
+		if (rom485[57] != 0x04) {
+			muteFlag[1] = 0;
+		}
 	}
 	//未使用
 	if (saveData[1].nameIndex == 0) {
-		multiUICMD[44] = 0x20;
-		multiUICMD[45] = 0x20;
-		multiUICMD[46] = 0x20;
-		multiUICMD[47] = 0x20;
+		multiUICMD[50] = 0x20;
+		multiUICMD[51] = 0x20;
+		multiUICMD[52] = 0xCE;
+		multiUICMD[53] = 0xB4;
+		multiUICMD[54] = 0xCA;
+		multiUICMD[55] = 0xB9;
+		multiUICMD[56] = 0xD3;
+		multiUICMD[57] = 0xC3;
+		multiUICMD[58] = 0x20;
+		multiUICMD[59] = 0x20;
 		statusColorCMD[1][7] = setTextGreen[0];
 		statusColorCMD[1][8] = setTextGreen[1];
 		numColorCMD[1][7] = setTextGreen[0];
 		numColorCMD[1][8] = setTextGreen[1];
 		ledFlag[1] = 3;
 	}
+	/* 自检 */
+	if (timeStamp == SELFTESTTIME || testFlag == 1) {
+		selfTest();
+	}
 	/* 通道 3 */
-	//正常
-	if ((float_ADCValue[2] > saveData[2].lower_limit)
-			&& (float_ADCValue[2] < saveData[2].upper_limit)
-			&& saveData[2].nameIndex != 0) {
-		multiUICMD[52] = 0xD5;
-		multiUICMD[53] = 0xFD;
-		multiUICMD[54] = 0xB3;
-		multiUICMD[55] = 0xA3;
-		statusColorCMD[2][7] = setTextGreen[0];
-		statusColorCMD[2][8] = setTextGreen[1];
-		numColorCMD[2][7] = setTextGreen[0];
-		numColorCMD[2][8] = setTextGreen[1];
-		ledFlag[2] = 1;
+	if (saveData[2].rangeIndex != 3) {
+		//正常
+		if ((float_ADCValue[2] > saveData[2].lower_limit)
+				&& (float_ADCValue[2] < saveData[2].upper_limit)
+				&& saveData[2].nameIndex != 0 && adc_Temp_filter[2] >= 558) {
+			multiUICMD[64] = 0x20;
+			multiUICMD[65] = 0x20;
+			multiUICMD[66] = 0x20;
+			multiUICMD[67] = 0xD5;
+			multiUICMD[68] = 0xFD;
+			multiUICMD[69] = 0xB3;
+			multiUICMD[70] = 0xA3;
+			multiUICMD[71] = 0x20;
+			multiUICMD[72] = 0x20;
+			multiUICMD[73] = 0x20;
+			statusColorCMD[2][7] = setTextGreen[0];
+			statusColorCMD[2][8] = setTextGreen[1];
+			numColorCMD[2][7] = setTextGreen[0];
+			numColorCMD[2][8] = setTextGreen[1];
+			ledFlag[2] = 0;
+		}
+		//欠压
+		if (float_ADCValue[2] <= saveData[2].lower_limit
+				&& adc_Temp_filter[2] >= 558 && saveData[2].nameIndex != 0) {
+			multiUICMD[64] = 0x20;
+			multiUICMD[65] = 0x20;
+			multiUICMD[66] = 0x20;
+			multiUICMD[67] = 0xC7;
+			multiUICMD[68] = 0xB7;
+			multiUICMD[69] = 0xD1;
+			multiUICMD[70] = 0xB9;
+			multiUICMD[71] = 0x20;
+			multiUICMD[72] = 0x20;
+			multiUICMD[73] = 0x20;
+			statusColorCMD[2][7] = setTextRed[0];
+			statusColorCMD[2][8] = setTextRed[1];
+			numColorCMD[2][7] = setTextRed[0];
+			numColorCMD[2][8] = setTextRed[1];
+			ledFlag[2] = 1;
+			if (rom485[77] != 0x01) {
+				muteFlag[2] = 0;
+			}
+		}
+		//超压
+		if (float_ADCValue[2] >= saveData[2].upper_limit
+				&& saveData[2].nameIndex != 0 && adc_Temp_filter[2] >= 558) {
+			multiUICMD[64] = 0x20;
+			multiUICMD[65] = 0x20;
+			multiUICMD[66] = 0x20;
+			multiUICMD[67] = 0xB3;
+			multiUICMD[68] = 0xAC;
+			multiUICMD[69] = 0xD1;
+			multiUICMD[70] = 0xB9;
+			multiUICMD[71] = 0x20;
+			multiUICMD[72] = 0x20;
+			multiUICMD[73] = 0x20;
+			statusColorCMD[2][7] = setTextRed[0];
+			statusColorCMD[2][8] = setTextRed[1];
+			numColorCMD[2][7] = setTextRed[0];
+			numColorCMD[2][8] = setTextRed[1];
+			ledFlag[2] = 2;
+			if (rom485[77] != 0x02) {
+				muteFlag[2] = 0;
+			}
+		}
+	} else {
+		//正常
+		if ((float_ADCValue[2] > saveData[2].upper_limit)
+				&& (float_ADCValue[2] < saveData[2].lower_limit)
+				&& saveData[2].nameIndex != 0 && adc_Temp_filter[2] >= 558) {
+			multiUICMD[64] = 0x20;
+			multiUICMD[65] = 0x20;
+			multiUICMD[66] = 0x20;
+			multiUICMD[67] = 0xD5;
+			multiUICMD[68] = 0xFD;
+			multiUICMD[69] = 0xB3;
+			multiUICMD[70] = 0xA3;
+			multiUICMD[71] = 0x20;
+			multiUICMD[72] = 0x20;
+			multiUICMD[73] = 0x20;
+			statusColorCMD[2][7] = setTextGreen[0];
+			statusColorCMD[2][8] = setTextGreen[1];
+			numColorCMD[2][7] = setTextGreen[0];
+			numColorCMD[2][8] = setTextGreen[1];
+			ledFlag[2] = 0;
+		}
+		//欠压
+		if (float_ADCValue[2] >= saveData[2].lower_limit
+				&& adc_Temp_filter[2] >= 558 && saveData[2].nameIndex != 0) {
+			multiUICMD[64] = 0x20;
+			multiUICMD[65] = 0x20;
+			multiUICMD[66] = 0x20;
+			multiUICMD[67] = 0xC7;
+			multiUICMD[68] = 0xB7;
+			multiUICMD[69] = 0xD1;
+			multiUICMD[70] = 0xB9;
+			multiUICMD[71] = 0x20;
+			multiUICMD[72] = 0x20;
+			multiUICMD[73] = 0x20;
+			statusColorCMD[2][7] = setTextRed[0];
+			statusColorCMD[2][8] = setTextRed[1];
+			numColorCMD[2][7] = setTextRed[0];
+			numColorCMD[2][8] = setTextRed[1];
+			ledFlag[2] = 1;
+			if (rom485[77] != 0x01) {
+				muteFlag[2] = 0;
+			}
+		}
+		//超压
+		if (float_ADCValue[2] <= saveData[2].upper_limit
+				&& saveData[2].nameIndex != 0 && adc_Temp_filter[2] >= 558) {
+			multiUICMD[64] = 0x20;
+			multiUICMD[65] = 0x20;
+			multiUICMD[66] = 0x20;
+			multiUICMD[67] = 0xB3;
+			multiUICMD[68] = 0xAC;
+			multiUICMD[69] = 0xD1;
+			multiUICMD[70] = 0xB9;
+			multiUICMD[71] = 0x20;
+			multiUICMD[72] = 0x20;
+			multiUICMD[73] = 0x20;
+			statusColorCMD[2][7] = setTextRed[0];
+			statusColorCMD[2][8] = setTextRed[1];
+			numColorCMD[2][7] = setTextRed[0];
+			numColorCMD[2][8] = setTextRed[1];
+			ledFlag[2] = 2;
+			if (rom485[77] != 0x02) {
+				muteFlag[2] = 0;
+			}
+		}
 	}
-	//欠压
-	if (float_ADCValue[2] <= saveData[2].lower_limit
-			&& saveData[2].nameIndex != 0) {
-		multiUICMD[52] = 0xC7;
-		multiUICMD[53] = 0xB7;
-		multiUICMD[54] = 0xD1;
-		multiUICMD[55] = 0xB9;
+	//无信号输入
+	if (adc_Temp_filter[2] < 558 && saveData[2].nameIndex != 0) {
+		multiUICMD[64] = 0xCE;
+		multiUICMD[65] = 0xDE;
+		multiUICMD[66] = 0xD0;
+		multiUICMD[67] = 0xC5;
+		multiUICMD[68] = 0xBA;
+		multiUICMD[69] = 0xC5;
+		multiUICMD[70] = 0xCA;
+		multiUICMD[71] = 0xE4;
+		multiUICMD[72] = 0xC8;
+		multiUICMD[73] = 0xEB;
 		statusColorCMD[2][7] = setTextRed[0];
 		statusColorCMD[2][8] = setTextRed[1];
 		numColorCMD[2][7] = setTextRed[0];
 		numColorCMD[2][8] = setTextRed[1];
-		ledFlag[2] = 0;
-	}
-	//超压
-	if (float_ADCValue[2] >= saveData[2].upper_limit
-			&& saveData[2].nameIndex != 0) {
-		multiUICMD[52] = 0xB3;
-		multiUICMD[53] = 0xAC;
-		multiUICMD[54] = 0xD1;
-		multiUICMD[55] = 0xB9;
-		statusColorCMD[2][7] = setTextRed[0];
-		statusColorCMD[2][8] = setTextRed[1];
-		numColorCMD[2][7] = setTextRed[0];
-		numColorCMD[2][8] = setTextRed[1];
-		ledFlag[2] = 2;
+		ledFlag[2] = 4;
+		if (rom485[77] != 0x04) {
+			muteFlag[2] = 0;
+		}
 	}
 	//未使用
 	if (saveData[2].nameIndex == 0) {
-		multiUICMD[52] = 0x20;
-		multiUICMD[53] = 0x20;
-		multiUICMD[54] = 0x20;
-		multiUICMD[55] = 0x20;
+		multiUICMD[64] = 0x20;
+		multiUICMD[65] = 0x20;
+		multiUICMD[66] = 0xCE;
+		multiUICMD[67] = 0xB4;
+		multiUICMD[68] = 0xCA;
+		multiUICMD[69] = 0xB9;
+		multiUICMD[70] = 0xD3;
+		multiUICMD[71] = 0xC3;
+		multiUICMD[72] = 0x20;
+		multiUICMD[73] = 0x20;
 		statusColorCMD[2][7] = setTextGreen[0];
 		statusColorCMD[2][8] = setTextGreen[1];
 		numColorCMD[2][7] = setTextGreen[0];
 		numColorCMD[2][8] = setTextGreen[1];
 		ledFlag[2] = 3;
 	}
+	/* 自检 */
+	if (timeStamp == SELFTESTTIME || testFlag == 1) {
+		selfTest();
+	}
 	//能量柱动画帧选择显示命令
 	//EE B1 23 00 01 00 02 00 FF FC FF FF
 	for (i = 0; i < 3; i++) {
 		percentPicCMD[i][4] = currentPage;
-		percentPicCMD[i][7] = (uint8_t) (float_ADCValue[i] * 10
-				/ (val_20mA[i] - val_4mA[i]));
+		if (saveData[i].rangeIndex != 3) {
+			percentPicCMD[i][7] = (uint8_t) (float_ADCValue[i] * 10
+					/ (val_20mA[i] - val_4mA[i]));
+		} else if (saveData[i].rangeIndex == 3) {
+			percentPicCMD[i][7] = (uint8_t) ((val_20mA[i] - val_4mA[i]
+					- (float_ADCValue[i] - val_4mA[i])) * 10
+					/ (val_20mA[i] - val_4mA[i]));
+		}
 		if (percentPicCMD[i][7] > 8)
 			percentPicCMD[i][7] = 8;
 		if (percentPicCMD[i][7] < 1)
 			percentPicCMD[i][7] = 1;
 		switch (ledFlag[i]) {
-		case 0:
+		case 1:
 			percentPicCMD[i][7] = 0;
 			break;
 		case 2:
 			percentPicCMD[i][7] = 9;
 			break;
+		case 3:
+			percentPicCMD[i][7] = 0;
+			break;
+		case 4:
+			percentPicCMD[i][7] = 0;
+			break;
 		default:
 			break;
 		}
 	}
-	HAL_UART_Transmit(&huart2, multiUICMD, 60, 0xFFFF);
+	HAL_UART_Transmit(&huart2, multiUICMD, 78, SendTime);
 	for (i = 0; i < 3; i++) {
-		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, 0xFFFF);
-		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, 0xFFFF);
-		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, 0xFFFF);
+		HAL_UART_Transmit(&huart2, numColorCMD[i], 13, SendTime);
+		HAL_UART_Transmit(&huart2, percentPicCMD[i], 12, SendTime);
+		HAL_UART_Transmit(&huart2, statusColorCMD[i], 13, SendTime);
 	}
-	if (ledFlag[0] == 1 && ledFlag[1] == 1 && ledFlag[2] == 1) {
+	if ((ledFlag[0] == 0 || ledFlag[0] == 3)
+			&& (ledFlag[1] == 0 || ledFlag[1] == 3)
+			&& (ledFlag[2] == 0 || ledFlag[2] == 3)) {
 		alarmFlag = 0;
+		//无报警，关闭报警继电器
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+		alarm_off();
 	} else {
 		//赋值 4 便于计算音量图标帧数
 		alarmFlag = 4;
+		//有报警，打开报警继电器
+		HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
 	}
 	//修改音量图标
 	volumePicCMD[4] = currentPage;
-	if (muteFlag == 1 || saveData[0].volume == 0) {
+	if (((muteFlag[0] == 1 || ledFlag[0] == 0)
+			&& (muteFlag[1] == 1 || ledFlag[1] == 0)
+			&& (muteFlag[2] == 1 || ledFlag[2] == 0))
+			|| saveData[0].volume == 0) {
 		volumePicCMD[7] = 0 + alarmFlag;
 		if (bebe) {
-			alarm_off();
-			alarm_off();
-			alarm_off();
-			alarm_off();
 			alarm_off();
 		}
 	} else {
@@ -1817,17 +2474,16 @@ void updateUI(void) {
 		} else if (volumePicCMD[7] > 7) {
 			volumePicCMD[7] = 3 + alarmFlag;
 		}
-		if (!bebe) {
-			alarm_on();
-			alarm_on();
-			alarm_on();
-			alarm_on();
+		if (!bebe && alarmFlag != 0) {
 			alarm_on();
 		}
 	}
 	//修改音量图标
-	HAL_UART_Transmit(&huart2, volumePicCMD, 12, 0xFFFF);
-
+	HAL_UART_Transmit(&huart2, volumePicCMD, 12, SendTime);
+	/* 自检 */
+	if (timeStamp == SELFTESTTIME || testFlag == 1) {
+		selfTest();
+	}
 	set485rom(1);
 }
 
@@ -1841,24 +2497,8 @@ void updateLed(void) {
 	uint8_t i;
 	for (i = 0; i < 3; i++) {
 		switch (ledFlag[i]) {
+		/* 正常 */
 		case 0:
-			if (i == 0) {
-				LED0A(0);
-				LED1A(0);
-				LED2A(1);
-			}
-			if (i == 1) {
-				LED0B(0);
-				LED1B(0);
-				LED2B(1);
-			}
-			if (i == 2) {
-				LED0C(0);
-				LED1C(0);
-				LED2C(1);
-			}
-			break;
-		case 1:
 			if (i == 0) {
 				LED0A(0);
 				LED1A(1);
@@ -1875,23 +2515,79 @@ void updateLed(void) {
 				LED2C(0);
 			}
 			break;
-		case 2:
-			if (i == 0) {
-				LED0A(1);
-				LED2A(0);
-				LED1A(0);
-			}
-			if (i == 1) {
-				LED0B(1);
-				LED2B(0);
-				LED1B(0);
-			}
-			if (i == 2) {
-				LED0C(1);
-				LED2C(0);
-				LED1C(0);
+			/* 欠压 */
+		case 1:
+			if (doubleLight == 1) {
+				if (i == 0) {
+					LED0A(0);
+					LED1A(0);
+					LED2A(1);
+				}
+				if (i == 1) {
+					LED0B(0);
+					LED1B(0);
+					LED2B(1);
+				}
+				if (i == 2) {
+					LED0C(0);
+					LED1C(0);
+					LED2C(1);
+				}
+			} else {
+				if (i == 0) {
+					LED0A(0);
+					LED1A(0);
+					LED2A(0);
+				}
+				if (i == 1) {
+					LED0B(0);
+					LED1B(0);
+					LED2B(0);
+				}
+				if (i == 2) {
+					LED0C(0);
+					LED1C(0);
+					LED2C(0);
+				}
 			}
 			break;
+			/* 超压 */
+		case 2:
+			if (doubleLight == 1) {
+				if (i == 0) {
+					LED0A(1);
+					LED2A(0);
+					LED1A(0);
+				}
+				if (i == 1) {
+					LED0B(1);
+					LED2B(0);
+					LED1B(0);
+				}
+				if (i == 2) {
+					LED0C(1);
+					LED2C(0);
+					LED1C(0);
+				}
+			} else {
+				if (i == 0) {
+					LED0A(0);
+					LED1A(0);
+					LED2A(0);
+				}
+				if (i == 1) {
+					LED0B(0);
+					LED1B(0);
+					LED2B(0);
+				}
+				if (i == 2) {
+					LED0C(0);
+					LED1C(0);
+					LED2C(0);
+				}
+			}
+			break;
+			/* 未使用 */
 		case 3:
 			if (i == 0) {
 				LED0A(0);
@@ -1901,12 +2597,48 @@ void updateLed(void) {
 			if (i == 1) {
 				LED0B(0);
 				LED1B(0);
-				LED2B(10);
+				LED2B(0);
 			}
 			if (i == 2) {
 				LED0C(0);
 				LED1C(0);
 				LED2C(0);
+			}
+			break;
+			/* 无信号输入 */
+		case 4:
+			if (doubleLight == 1) {
+				if (i == 0) {
+					LED0A(1);
+					LED1A(0);
+					LED2A(1);
+				}
+				if (i == 1) {
+					LED0B(1);
+					LED1B(0);
+					LED2B(1);
+				}
+				if (i == 2) {
+					LED0C(1);
+					LED1C(0);
+					LED2C(1);
+				}
+			} else {
+				if (i == 0) {
+					LED0A(0);
+					LED1A(0);
+					LED2A(0);
+				}
+				if (i == 1) {
+					LED0B(0);
+					LED1B(0);
+					LED2B(0);
+				}
+				if (i == 2) {
+					LED0C(0);
+					LED1C(0);
+					LED2C(0);
+				}
 			}
 			break;
 		default:
@@ -1922,17 +2654,16 @@ void updateLed(void) {
  * 返 回 值: 无
  * 说    明: 无
  */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* ADCHandle) {
-
-}
-
+//void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *ADCHandle) {
+//
+//}
 /**
  * 函数功能: 串口中断回调函数
  * 输入参数: UartHandle：串口外设设备句柄
  * 返 回 值: 无
  * 说    明: 无
  */
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef* uartHandle) {
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uartHandle) {
 
 }
 /**
@@ -1941,9 +2672,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef* uartHandle) {
  * 返 回 值: 无
  * 说    明: 无
  */
-void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
+void UART_RxIDLECallback(UART_HandleTypeDef *uartHandle) {
 	uint32_t temp;
-
+	/* RS485接收 */
 	if (__HAL_UART_GET_FLAG(&huart3, UART_FLAG_IDLE) != RESET) {
 		__HAL_UART_CLEAR_IDLEFLAG(&huart3);
 		HAL_UART_DMAStop(&huart3);
@@ -1954,7 +2685,7 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 		unsigned char i, sendcount;
 		unsigned int record_num, record_add;
 		//调试用
-		RS485_Send_Data(RS485_RX_BUF, 8);
+//		RS485_Send_Data(RS485_RX_BUF, 8);
 
 		crc = CRC16(RS485_RX_BUF, 6);
 		//  buffer[6]=crc&0xff;
@@ -1965,53 +2696,52 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 
 		// 判断地址与crc校验
 		if ((RS485_RX_BUF[0] == saveData[0].modbusAddr)
-				&& (RS485_RX_BUF[1] == 0x03)     //读取命令
+				&& (RS485_RX_BUF[1] == 0x03)               //读取命令
 				&& (RS485_RX_BUF[6] == buffer[6])
-				&& (RS485_RX_BUF[7] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。�
+				&& (RS485_RX_BUF[7] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。
 													 // 获取数据
-													 //清空
+													 // 清空
 			memset(send_mydata, 0, sizeof(send_mydata));
 			// 地址
-			send_mydata[0] = saveData[0].modbusAddr;         //地址
-			send_mydata[1] = 0x03;         // 功能码
+			send_mydata[0] = saveData[0].modbusAddr;       // 地址
+			send_mydata[1] = 0x03;         				   // 功能码
 			send_mydata[2] = RS485_RX_BUF[5] << 1;         // 寄存器个数乘以二
 
-			record_add = RS485_RX_BUF[2] << 8 | RS485_RX_BUF[3];       //组合为复合地址
+			record_add = RS485_RX_BUF[2] << 8 | RS485_RX_BUF[3];   //组合为复合地址
 			if (record_add > 256)
 				record_add = 256;
-			record_num = RS485_RX_BUF[5] * 2;         //组合为数据长度＠├┱阔啊站 看扩展为2倍 数量�
+			record_num = RS485_RX_BUF[5] * 2;     //组合为数据长度＠├┱阔啊站 看扩展为2倍 数量�
 			if (record_num > 128)
 				record_num = 128;
 
 			// rom485[61]//=rom485[81];
-			//  rom485[63]//=rom485[83];
-			//修改真空报警状态， 上下报警互换
+			// rom485[63]//=rom485[83];
+			// 修改真空报警状态， 上下报警互换
 
 			memcpy((&send_mydata[3]), &rom485[record_add * 2], record_num); //加一大段数据
 			i = record_num + 3;
 
-			//添加校验码   modscan 高位在前
+			// 添加校验码 modscan 高位在前
 
 			crc = CRC16(send_mydata, i);
 			send_mydata[i] = (crc & 0xff00) >> 8;
 			send_mydata[i + 1] = crc & 0xff;
 
 			sendcount = i + 2;
-			RS485_TX_ON()
-			;         //发送使能
-			for (i = 0; i < sendcount; i++)
-				RS485_Send_Data(send_mydata, sizeof(send_mydata));
-
+			RS485_TX_ON();         //发送使能
+//			for (i = 0; i < sendcount; i++)
+//				RS485_Send_Data(send_mydata, sizeof(send_mydata));
+			RS485_Send_Data(send_mydata, sendcount);
 			RS485_TX_OFF()
 			;
 		}
 		memset(RS485_RX_BUF, 0xFF, sizeof(RS485_RX_BUF));
-		if (HAL_UART_Receive_DMA(&huart3, (uint8_t *) RS485_RX_BUF, 8)
+		if (HAL_UART_Receive_DMA(&huart3, (uint8_t*) RS485_RX_BUF, 8)
 				!= HAL_OK) {
 //			Error_Handler();
 		}
 	}
-
+	/* 串口屏接收 */
 	if (__HAL_UART_GET_FLAG(&huart2, UART_FLAG_IDLE) != RESET) {
 		__HAL_UART_CLEAR_IDLEFLAG(&huart2);
 		HAL_UART_DMAStop(&huart2);
@@ -2026,38 +2756,41 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 	if (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) != RESET) {
 		__HAL_UART_CLEAR_IDLEFLAG(&huart1);
 		HAL_UART_DMAStop(&huart1);
+		/* 未连接蓝牙 */
 		if (bluetoothFlag == 0) {
 			bluetoothFlag = 1;
 		} else {
-//todo
-			/* 蓝牙连接判断 */
-			/* 未连接蓝牙不操作 */
 			/* 已连接蓝牙发送当前所有数据 */
 			unsigned char buffer[8];
 			uint8_t send_mydata[150];
 			unsigned short crc;
-			unsigned char i, sendcount;
+			unsigned char i = 0, sendcount;
 			unsigned int record_num, record_add;
 
-			crc = CRC16(BLUETOOTH_RX_BUF, (BLUETOOTH_RX_BUF[1] == 0x03 ? 6 : (BLUETOOTH_RX_BUF[6] + 7)));
+			if (BLUETOOTH_RX_BUF[1] == 0x03 || BLUETOOTH_RX_BUF[1] == 0x06
+					|| BLUETOOTH_RX_BUF[1] == 0x41) {
+				crc = CRC16(BLUETOOTH_RX_BUF, 6);
+			} else {
+				crc = CRC16(BLUETOOTH_RX_BUF, (BLUETOOTH_RX_BUF[6] + 7));
+			}
 			//  buffer[6]=crc&0xff;
 			//  buffer[7]=(crc&0xff00)>>8;
 			//  modscan 是校验码高位在前，低位在后
 			buffer[7] = crc & 0xff;
 			buffer[6] = (crc & 0xff00) >> 8;
 
-			// 判断地址与crc校验
+			// 判断地址、命令与crc校验
 			if ((BLUETOOTH_RX_BUF[0] == 0xFF)
 					&& (BLUETOOTH_RX_BUF[1] == 0x03)     //读取命令
 					&& (BLUETOOTH_RX_BUF[6] == buffer[6])
-					&& (BLUETOOTH_RX_BUF[7] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。�
+					&& (BLUETOOTH_RX_BUF[7] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。
 				// 获取数据
 				//清空
 				memset(send_mydata, 0, sizeof(send_mydata));
 				// 地址
 				send_mydata[0] = 0xFF;         //地址
 				send_mydata[1] = 0x03;         // 功能码
-				send_mydata[2] = BLUETOOTH_RX_BUF[5] << 1;         // 寄存器个数乘以二
+				send_mydata[2] = BLUETOOTH_RX_BUF[5] << 1;       // 寄存器个数乘以二
 
 				record_add = BLUETOOTH_RX_BUF[2] << 8 | BLUETOOTH_RX_BUF[3]; //组合为复合地址
 				if (record_add > 256)
@@ -2065,7 +2798,6 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 				record_num = BLUETOOTH_RX_BUF[5] * 2; //组合为数据长度＠├┱阔啊站 看扩展为2倍 数量�
 				if (record_num > 128)
 					record_num = 128;
-
 				// rom485[61]//=rom485[81];
 				//  rom485[63]//=rom485[83];
 				//修改真空报警状态， 上下报警互换
@@ -2080,18 +2812,120 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 				send_mydata[i + 1] = crc & 0xff;
 
 				sendcount = i + 2;
-				//for (i = 0; i < sendcount; i++)
-				HAL_UART_Transmit(&huart1, send_mydata, sendcount, 0xFFFF);
+				HAL_UART_Transmit(&huart1, send_mydata, sendcount, SendTime);
 			}
-			// 判断地址与crc校验
+			// 判断地址、命令与crc校验
 			if ((BLUETOOTH_RX_BUF[0] == 0xFF)
-					&& (BLUETOOTH_RX_BUF[1] == 0x10)     //读取命令
-					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 7] == buffer[6])
-					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 8] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。�
+					&& (BLUETOOTH_RX_BUF[1] == 0x41)     //读取密码、质保期命令
+					&& (BLUETOOTH_RX_BUF[6] == buffer[6])
+					&& (BLUETOOTH_RX_BUF[7] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。
 				// 获取数据
+				//清空
+				memset(send_mydata, 0, sizeof(send_mydata));
+				// 地址
+				send_mydata[0] = 0xFF;         //地址
+				send_mydata[1] = 0x41;         // 功能码
+				send_mydata[2] = BLUETOOTH_RX_BUF[5] << 1;       // 寄存器个数乘以二
 
-				//todo
-				//根据蓝牙接收进行保存更新设置
+				record_add = BLUETOOTH_RX_BUF[2] << 8 | BLUETOOTH_RX_BUF[3]; //组合为复合地址
+				switch (record_add) {
+				case 100:
+					for (i = 3; i < 16; i++) {
+						send_mydata[i] = saveData[0].omePassword[i - 3];
+					}
+					break;
+				case 200:
+					for (i = 3; i < 16; i++) {
+						send_mydata[i] = saveData[0].rootPassword[i - 3];
+					}
+					break;
+				case 300:
+					i = 3;
+					send_mydata[i] = saveData[0].omeDays >> 8;
+					i++;
+					send_mydata[i] = saveData[0].omeDays;
+					break;
+				case 400:
+					i = 3;
+					send_mydata[i] = saveData[0].rootDays >> 8;
+					i++;
+					send_mydata[i] = saveData[0].rootDays;
+					break;
+				}
+
+				i++;
+				//添加校验码   modscan 高位在前
+
+				crc = CRC16(send_mydata, i);
+				send_mydata[i] = (crc & 0xff00) >> 8;
+				send_mydata[i + 1] = crc & 0xff;
+
+				sendcount = i + 2;
+				HAL_UART_Transmit(&huart1, send_mydata, sendcount, SendTime);
+			}
+			// 判断地址、命令与crc校验
+			if ((BLUETOOTH_RX_BUF[0] == 0xFF)
+					&& (BLUETOOTH_RX_BUF[1] == 0x42)     //写入密码、质保期命令
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 7] == buffer[6])
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 8] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。
+				// 获取数据
+				//清空
+				memset(send_mydata, 0, sizeof(send_mydata));
+				// 地址
+				send_mydata[0] = 0xFF;         //地址
+				send_mydata[1] = 0x42;         // 功能码
+				send_mydata[2] = BLUETOOTH_RX_BUF[5] << 1;       // 寄存器个数乘以二
+
+				record_add = BLUETOOTH_RX_BUF[2] << 8 | BLUETOOTH_RX_BUF[3]; //组合为复合地址
+				switch (record_add) {
+				case 100:
+					for (i = 3; i < 16; i++) {
+						saveData[0].omePassword[i - 3] =
+								BLUETOOTH_RX_BUF[i + 3];
+					}
+					break;
+				case 200:
+					for (i = 3; i < 16; i++) {
+						saveData[0].rootPassword[i - 3] =
+								BLUETOOTH_RX_BUF[i + 3];
+					}
+					break;
+				case 300:
+					saveData[0].omeDays = (BLUETOOTH_RX_BUF[6] << 8)
+							& BLUETOOTH_RX_BUF[7];
+					break;
+				case 400:
+					saveData[0].rootDays = (BLUETOOTH_RX_BUF[6] << 8)
+							& BLUETOOTH_RX_BUF[7];
+					break;
+				}
+
+				send_mydata[2] = BLUETOOTH_RX_BUF[2];	//起始寄存器地址
+				send_mydata[3] = BLUETOOTH_RX_BUF[3];
+				send_mydata[4] = BLUETOOTH_RX_BUF[4];
+				send_mydata[5] = BLUETOOTH_RX_BUF[5];
+
+				crc = CRC16(send_mydata, 6);
+				send_mydata[6] = (crc & 0xff00) >> 8;
+				send_mydata[7] = crc & 0xff;
+
+				HAL_UART_Transmit(&huart1, send_mydata, 8, SendTime);
+			}
+			// 判断地址、命令与crc校验
+			if ((BLUETOOTH_RX_BUF[0] == 0xFF)
+					&& (BLUETOOTH_RX_BUF[1] == 0x10)     //写入命令
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 7] == buffer[6])
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 8] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。
+
+				record_add = BLUETOOTH_RX_BUF[2] << 8 | BLUETOOTH_RX_BUF[3]; //组合为复合地址
+				if (record_add > 256)
+					record_add = 256;
+				record_num = BLUETOOTH_RX_BUF[5] * 2; //组合为数据长度＠├┱阔啊站 看扩展为2倍 数量�
+				if (record_num > 128)
+					record_num = 128;
+				//复制设置到rom485
+				memcpy(&rom485[record_add * 2], (&BLUETOOTH_RX_BUF[7]),
+						record_num); //加一大段数据
 
 				//清空
 				memset(send_mydata, 0, sizeof(send_mydata));
@@ -2107,27 +2941,105 @@ void UART_RxIDLECallback(UART_HandleTypeDef* uartHandle) {
 				send_mydata[6] = (crc & 0xff00) >> 8;
 				send_mydata[7] = crc & 0xff;
 
-				HAL_UART_Transmit(&huart1, send_mydata, 8, 0xFFFF);
+				HAL_UART_Transmit(&huart1, send_mydata, 8, SendTime);
+			}
+			// 判断地址、命令与crc校验
+			if ((BLUETOOTH_RX_BUF[0] == 0xFF)
+					&& (BLUETOOTH_RX_BUF[1] == 0x06)     //test按钮、mute按钮、刷新界面
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 7] == buffer[6])
+					&& (BLUETOOTH_RX_BUF[BLUETOOTH_RX_BUF[6] + 8] == buffer[7])) { // 成功后组合数据 计算 CRC 并发送。
+
+				//test按钮
+				if (BLUETOOTH_RX_BUF[3] == 0x01) {
+					testFlag = 1;
+				}
+				//mute按钮
+				if (BLUETOOTH_RX_BUF[3] == 0x02) {
+					//修改音量图标
+					volumePicCMD[4] = currentPage;
+					if (muteFlag[0] == 0
+							&& (ledFlag[0] != 0 || ledFlag[0] != 3)) {
+						volumePicCMD[7] = 0 + alarmFlag;
+						muteFlag[0] = 1;
+					}
+					if (muteFlag[1] == 0
+							&& (ledFlag[1] != 0 || ledFlag[1] != 3)) {
+						volumePicCMD[7] = 0 + alarmFlag;
+						muteFlag[1] = 1;
+					}
+					if (muteFlag[2] == 0
+							&& (ledFlag[2] != 0 || ledFlag[2] != 3)) {
+						volumePicCMD[7] = 0 + alarmFlag;
+						muteFlag[2] = 1;
+					} else {
+						volumePicCMD[7] = (uint8_t) (saveData[0].volume / 10);
+						if (volumePicCMD[7] <= 4) {
+							volumePicCMD[7] = 1 + alarmFlag;
+						} else if (volumePicCMD[7] > 4
+								&& volumePicCMD[7] <= 7) {
+							volumePicCMD[7] = 2 + alarmFlag;
+						} else if (volumePicCMD[7] > 7) {
+							volumePicCMD[7] = 3 + alarmFlag;
+						}
+						if (muteFlag[0] == 1
+								&& (ledFlag[0] != 0 || ledFlag[0] != 3)) {
+							volumePicCMD[7] = 0 + alarmFlag;
+							muteFlag[0] = 0;
+						}
+						if (muteFlag[1] == 1
+								&& (ledFlag[1] != 0 || ledFlag[1] != 3)) {
+							volumePicCMD[7] = 0 + alarmFlag;
+							muteFlag[1] = 0;
+						}
+						if (muteFlag[2] == 1
+								&& (ledFlag[2] != 0 || ledFlag[2] != 3)) {
+							volumePicCMD[7] = 0 + alarmFlag;
+							muteFlag[2] = 0;
+						}
+					}
+					//修改音量图标
+					HAL_UART_Transmit(&huart2, volumePicCMD, 12, SendTime);
+				}
+				//刷新界面
+				if (BLUETOOTH_RX_BUF[3] == 0x03) {
+					read485rom(0);
+					eepromWriteSetting();
+					testFlag = 1;
+				}
+				//清空
+				memset(send_mydata, 0, sizeof(send_mydata));
+
+				send_mydata[0] = 0xFF;         //地址
+				send_mydata[1] = 0x10;         // 功能码
+				send_mydata[2] = BLUETOOTH_RX_BUF[2];	//起始寄存器地址
+				send_mydata[3] = BLUETOOTH_RX_BUF[3];
+				send_mydata[4] = BLUETOOTH_RX_BUF[4];
+				send_mydata[5] = BLUETOOTH_RX_BUF[5];
+
+				crc = CRC16(send_mydata, 6);
+				send_mydata[6] = (crc & 0xff00) >> 8;
+				send_mydata[7] = crc & 0xff;
+
+				HAL_UART_Transmit(&huart1, send_mydata, 8, SendTime);
 			}
 			memset(BLUETOOTH_RX_BUF, 0xFF, sizeof(BLUETOOTH_RX_BUF));
-			if (HAL_UART_Receive_DMA(&huart1, (uint8_t *) BLUETOOTH_RX_BUF,
+			if (HAL_UART_Receive_DMA(&huart1, (uint8_t*) BLUETOOTH_RX_BUF,
 			CMD_MAX_SIZE) != HAL_OK) {
 				Error_Handler();
 			}
 			/* 开启串口空闲中断 */
 			__HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
-			/* 已连接蓝牙收到设置命令，保存数据到flash */
 		}
 	}
 }
 
 /**
- * @功能简介 : 将浮点数的各个位的数值转换成字符串
- * @入口参数 : data - 浮点数 | *buf - 转换结果保存位置 | 长度
+ * @功能简介 : 定时器回调
+ * @入口参数 : 无
  * @出口参数 : 无
  * @历史版本 : V0.0.1 - Ethan - 2018/01/03
  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* tim_baseHandle) {
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *tim_baseHandle) {
 	currentTime++;
 	if (currentTime > 999) {
 		currentTime = 0;
@@ -2145,13 +3057,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* tim_baseHandle) {
 	/* 定时更新ADC */
 	if ((currentTime % 3) == 0) {
 		ADCFlag = 1;
+		doubleLight = -doubleLight;
 	}
 	/* 定时获取画面ID */
 	//EE B1 01 FF FC FF FF
 	if (currentTime == 500) {
 		getUIFlag = 1;
 	}
-	if (currentPage == PAGE_START && (currentTime - timeStamp) >= 150) {
+	if (currentPage == PAGE_START && (currentTime - timeStamp) >= 220) {
 		uint8_t temp[9];
 //跳转主画面3
 //跳转至主屏幕
@@ -2165,15 +3078,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* tim_baseHandle) {
 		temp[6] = 0xFC;
 		temp[7] = 0xFF;
 		temp[8] = 0xFF;
-		HAL_UART_Transmit(&huart2, temp, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp, 9, SendTime);
 		lastPage = currentPage;
 		currentPage = PAGE_MAIN3;
 		timeStamp = SELFTESTTIME;
 
-		alarm_off();
-		alarm_off();
-		alarm_off();
-		alarm_off();
 		alarm_off();
 	}
 }
@@ -2198,9 +3107,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN) {
 		BUTTON_CLEAR_GPIO_PIN) == BUTTON_CLEAR_DOWN_LEVEL) {
 			//修改音量图标
 			volumePicCMD[4] = currentPage;
-			if (muteFlag == 0) {
+			if (muteFlag[0] == 0 && (ledFlag[0] != 0 || ledFlag[0] != 3)) {
 				volumePicCMD[7] = 0 + alarmFlag;
-				muteFlag = 1;
+				muteFlag[0] = 1;
+			}
+			if (muteFlag[1] == 0 && (ledFlag[1] != 0 || ledFlag[1] != 3)) {
+				volumePicCMD[7] = 0 + alarmFlag;
+				muteFlag[1] = 1;
+			}
+			if (muteFlag[2] == 0 && (ledFlag[2] != 0 || ledFlag[2] != 3)) {
+				volumePicCMD[7] = 0 + alarmFlag;
+				muteFlag[2] = 1;
 			} else {
 				volumePicCMD[7] = (uint8_t) (saveData[0].volume / 10);
 				if (volumePicCMD[7] <= 4) {
@@ -2210,10 +3127,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_PIN) {
 				} else if (volumePicCMD[7] > 7) {
 					volumePicCMD[7] = 3 + alarmFlag;
 				}
-				muteFlag = 0;
+				if (muteFlag[0] == 1 && (ledFlag[0] != 0 || ledFlag[0] != 3)) {
+					volumePicCMD[7] = 0 + alarmFlag;
+					muteFlag[0] = 0;
+				}
+				if (muteFlag[1] == 1 && (ledFlag[1] != 0 || ledFlag[1] != 3)) {
+					volumePicCMD[7] = 0 + alarmFlag;
+					muteFlag[1] = 0;
+				}
+				if (muteFlag[2] == 1 && (ledFlag[2] != 0 || ledFlag[2] != 3)) {
+					volumePicCMD[7] = 0 + alarmFlag;
+					muteFlag[2] = 0;
+				}
 			}
 			//修改音量图标
-			HAL_UART_Transmit(&huart2, volumePicCMD, 12, 0xFFFF);
+			HAL_UART_Transmit(&huart2, volumePicCMD, 12, SendTime);
 		}
 		__HAL_GPIO_EXTI_CLEAR_IT(BUTTON_CLEAR_GPIO_PIN);
 	}
@@ -2399,9 +3327,6 @@ void set485rom(uint8_t func) {
 		rom485[22] = 0;  //气体索引1
 		rom485[23] = saveData[0].nameIndex;
 
-		rom485[40] = 0;  //出厂字节2
-		rom485[41] = 0;
-
 		rom485[42] = 0;  //气体索引2
 		rom485[43] = saveData[1].nameIndex;
 
@@ -2412,22 +3337,62 @@ void set485rom(uint8_t func) {
 		rom485[63] = saveData[2].nameIndex;
 
 		j = 24;
-		memcpy((&rom485[j]), &saveData[0].upper_limit, 8);          //上下限1
+		if (saveData[0].rangeIndex != 3) {
+			memcpy((&rom485[j]), &saveData[0].upper_limit, 8);          //上下限1
+		} else {
+			memcpy((&rom485[j]), &saveData[0].lower_limit, 8);          //上下限1
+		}
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
 
+		j = 26;
+		if (saveData[0].rangeIndex != 3) {
+			memcpy((&rom485[j]), &saveData[0].lower_limit, 8);          //上下限1
+		} else {
+			memcpy((&rom485[j]), &saveData[0].upper_limit, 8);          //上下限1
+		}
 		change_float_big_485rom(j);
 		change_float_big_485rom(j + 4);
 
 		j = 44;
-		memcpy((&rom485[j]), &saveData[1].upper_limit, 8);          //上下限2
+		if (saveData[1].rangeIndex != 3) {
+			memcpy((&rom485[j]), &saveData[1].upper_limit, 8);          //上下限2
+		} else {
+			memcpy((&rom485[j]), &saveData[1].lower_limit, 8);          //上下限2
+		}
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
 
+		j = 46;
+		if (saveData[1].rangeIndex != 3) {
+			memcpy((&rom485[j]), &saveData[1].lower_limit, 8);          //上下限2
+		} else {
+			memcpy((&rom485[j]), &saveData[1].upper_limit, 8);          //上下限2
+		}
 		change_float_big_485rom(j);
 		change_float_big_485rom(j + 4);
 
 		j = 64;
-		memcpy((&rom485[j]), &saveData[1].upper_limit, 8);          //上下限3
-
+		if (saveData[2].rangeIndex != 3) {
+			memcpy((&rom485[j]), &saveData[2].upper_limit, 8);          //上下限3
+		} else {
+			memcpy((&rom485[j]), &saveData[2].lower_limit, 8);          //上下限3
+		}
 		change_float_big_485rom(j);
 		change_float_big_485rom(j + 4);
+
+		j = 66;
+		if (saveData[2].rangeIndex != 3) {
+			memcpy((&rom485[j]), &saveData[2].lower_limit, 8);          //上下限3
+		} else {
+			memcpy((&rom485[j]), &saveData[2].upper_limit, 8);          //上下限3
+		}
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
+		/* 测量范围索引 */
+		rom485[40] = saveData[0].rangeIndex;
+		rom485[60] = saveData[1].rangeIndex;
+		rom485[80] = saveData[2].rangeIndex;
 	}
 
 	rom485[4] = 0;	//报警1
@@ -2437,42 +3402,63 @@ void set485rom(uint8_t func) {
 	rom485[8] = 0;	//报警3
 	rom485[9] = (ledFlag[2] == 1 ? 0 : 1);
 
+	rom485[11] = 0; //静音状态
+	rom485[12] = muteFlag[0] || muteFlag[1] || muteFlag[2]; //静音状态
+
 	j = 37;          // 使用8位寄存器作为状态存储量
 	switch (ledFlag[0]) {
 	case 0:
-		rom485[j] = 0x01;
+		rom485[j] = 0x00;
 		break;
 	case 1:
-		rom485[j] = 0x00;
+		rom485[j] = 0x01;
 		break;
 	case 2:
 		rom485[j] = 0x02;
+		break;
+	case 3:
+		rom485[j] = 0x03;
+		break;
+	case 4:
+		rom485[j] = 0x04;
 		break;
 	}
 
 	j = 57;
 	switch (ledFlag[1]) {
 	case 0:
-		rom485[j] = 0x01;
+		rom485[j] = 0x00;
 		break;
 	case 1:
-		rom485[j] = 0x00;
+		rom485[j] = 0x01;
 		break;
 	case 2:
 		rom485[j] = 0x02;
+		break;
+	case 3:
+		rom485[j] = 0x03;
+		break;
+	case 4:
+		rom485[j] = 0x04;
 		break;
 	}
 
 	j = 77;
 	switch (ledFlag[2]) {
 	case 0:
-		rom485[j] = 0x01;
+		rom485[j] = 0x00;
 		break;
 	case 1:
-		rom485[j] = 0x00;
+		rom485[j] = 0x01;
 		break;
 	case 2:
 		rom485[j] = 0x02;
+		break;
+	case 3:
+		rom485[j] = 0x03;
+		break;
+	case 4:
+		rom485[j] = 0x04;
 		break;
 	}
 
@@ -2484,6 +3470,92 @@ void set485rom(uint8_t func) {
 
 	memcpy((&rom485[72]), &float_ADCValue[2], 4);
 	change_float_big_485rom(72);
+}
+
+void read485rom(uint8_t func) {
+	uint8_t j;
+	if (func == 0) {
+
+		unsigned int bautrate = 0;
+		saveData[0].modbusAddr = rom485[1]; //地址
+
+		bautrate = (rom485[2] << 8) & rom485[3];
+
+		switch (bautrate) {
+		case 2400:
+			saveData[0].baudrateIndex = 0;
+			break;
+		case 4800:
+			saveData[0].baudrateIndex = 1;
+			break;
+		case 9600:
+			saveData[0].baudrateIndex = 2;
+			break;
+		case 19200:
+			saveData[0].baudrateIndex = 3;
+			break;
+		case 38400:
+			saveData[0].baudrateIndex = 4;
+			break;
+		}
+
+		saveData[0].nameIndex = rom485[23];
+		saveData[1].nameIndex = rom485[43];
+		saveData[2].nameIndex = rom485[63];
+		saveData[0].rangeIndex = rom485[40];
+		saveData[1].rangeIndex = rom485[60];
+		saveData[2].rangeIndex = rom485[80];
+
+		j = 24;
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
+		if (saveData[0].rangeIndex != 3) {
+			memcpy(&saveData[0].upper_limit, (&rom485[j]), 8);          //上下限1
+		} else {
+			memcpy(&saveData[0].lower_limit, (&rom485[j]), 8);          //上下限1
+		}
+		j = 26;
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
+		if (saveData[0].rangeIndex != 3) {
+			memcpy(&saveData[0].lower_limit, (&rom485[j]), 8);          //上下限1
+		} else {
+			memcpy(&saveData[0].upper_limit, (&rom485[j]), 8);          //上下限1
+		}
+
+		j = 44;
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
+		if (saveData[1].rangeIndex != 3) {
+			memcpy(&saveData[1].upper_limit, (&rom485[j]), 8);          //上下限2
+		} else {
+			memcpy(&saveData[1].lower_limit, (&rom485[j]), 8);          //上下限2
+		}
+		j = 46;
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
+		if (saveData[1].rangeIndex != 3) {
+			memcpy(&saveData[1].lower_limit, (&rom485[j]), 8);          //上下限2
+		} else {
+			memcpy(&saveData[1].upper_limit, (&rom485[j]), 8);          //上下限2
+		}
+		j = 64;
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
+		if (saveData[2].rangeIndex != 3) {
+			memcpy(&saveData[2].upper_limit, (&rom485[j]), 8);          //上下限3
+		} else {
+			memcpy(&saveData[2].lower_limit, (&rom485[j]), 8);          //上下限3
+		}
+		j = 66;
+		change_float_big_485rom(j);
+		change_float_big_485rom(j + 4);
+		if (saveData[2].rangeIndex != 3) {
+			memcpy(&saveData[2].lower_limit, (&rom485[j]), 8);          //上下限3
+		} else {
+			memcpy(&saveData[2].upper_limit, (&rom485[j]), 8);          //上下限3
+		}
+	}
 }
 
 void change_float_big_485rom(unsigned int j)  //修改浮点数在 rom 中的存储大小端
@@ -2499,78 +3571,102 @@ void change_float_big_485rom(unsigned int j)  //修改浮点数在 rom 中的存
 }
 
 //单线声音通讯函数通
-void Line_1A_WTN5(unsigned char SB_DATA) {
-	unsigned char S_DATA, B_DATA;
-	unsigned char j;
-
-	HAL_NVIC_DisableIRQ(USART1_IRQn);
-	HAL_NVIC_DisableIRQ(USART2_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel1_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel4_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel5_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel6_IRQn);
-	HAL_NVIC_DisableIRQ(DMA1_Channel7_IRQn);
-	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
-	HAL_NVIC_DisableIRQ(TIM2_IRQn);
-
-	S_DATA = SB_DATA;
-	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_3, GPIO_PIN_RESET);	// 数据位拉低
-	HAL_Delay(5);
-	B_DATA = S_DATA & 0X01;
-
-	for (j = 0; j < 8; j++) {
-		if (B_DATA == 1) {
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_3, GPIO_PIN_SET);
-			bsp_Delay_Nus(600);
-
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_3, GPIO_PIN_RESET);
-			bsp_Delay_Nus(200);
-		} else {
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_3, GPIO_PIN_SET);
-			bsp_Delay_Nus(200);
-
-			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_3, GPIO_PIN_RESET);
-			bsp_Delay_Nus(600);
-		}
-		S_DATA = S_DATA >> 1;
-		B_DATA = S_DATA & 0X01;
-	}
-	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_3, GPIO_PIN_SET);
-
-	HAL_NVIC_EnableIRQ(USART1_IRQn);
-	HAL_NVIC_EnableIRQ(USART2_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
-	HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
-	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
-	HAL_NVIC_EnableIRQ(TIM2_IRQn);
-}
+//void Line_1A_WTN5(unsigned char SB_DATA) {
+//	unsigned char S_DATA, B_DATA;
+//	unsigned char j;
+//
+//	HAL_NVIC_DisableIRQ(USART1_IRQn);
+//	HAL_NVIC_DisableIRQ(USART2_IRQn);
+//	HAL_NVIC_DisableIRQ(DMA1_Channel1_IRQn);
+//	HAL_NVIC_DisableIRQ(DMA1_Channel4_IRQn);
+//	HAL_NVIC_DisableIRQ(DMA1_Channel5_IRQn);
+//	HAL_NVIC_DisableIRQ(DMA1_Channel6_IRQn);
+//	HAL_NVIC_DisableIRQ(DMA1_Channel7_IRQn);
+//	HAL_NVIC_DisableIRQ(EXTI15_10_IRQn);
+//	HAL_NVIC_DisableIRQ(TIM2_IRQn);
+//
+//	S_DATA = SB_DATA;
+//	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);	// 数据位拉低
+//	HAL_Delay(5);
+//	B_DATA = S_DATA & 0X01;
+//
+//	for (j = 0; j < 8; j++) {
+//		if (B_DATA == 1) {
+//			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+//			bsp_Delay_Nus(600);
+//
+//			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+//			bsp_Delay_Nus(200);
+//		} else {
+//			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+//			bsp_Delay_Nus(200);
+//
+//			HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_RESET);
+//			bsp_Delay_Nus(600);
+//		}
+//		S_DATA = S_DATA >> 1;
+//		B_DATA = S_DATA & 0X01;
+//	}
+//	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_13, GPIO_PIN_SET);
+//
+//	HAL_NVIC_EnableIRQ(USART1_IRQn);
+//	HAL_NVIC_EnableIRQ(USART2_IRQn);
+//	HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
+//	HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+//	HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
+//	HAL_NVIC_EnableIRQ(DMA1_Channel6_IRQn);
+//	HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
+//	HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+//	HAL_NVIC_EnableIRQ(TIM2_IRQn);
+//}
 
 void alarm_on(void) //播放声音
 {
-	uint8_t i;
-	for (i = 0; i < 5; i++) {
-		/* 设置音量 */
-		HAL_Delay(50);
-		Line_1A_WTN5(0xE0 + ((uint8_t) (saveData[0].volume * 1.5) & 0x0F)); //音量
-		HAL_Delay(50);
-		Line_1A_WTN5(0xF2); //连续播放
-		HAL_Delay(50);
-		Line_1A_WTN5(0x00); //播放第零语音
-		HAL_Delay(50);
-	}
+//	uint8_t i;
+//	for (i = 0; i < 5; i++) {
+//		/* 设置音量 */
+//		HAL_Delay(50);
+//		Line_1A_WTN5(0xE0 + ((uint8_t) (saveData[0].volume * 1.5) & 0x0F)); //音量
+//		HAL_Delay(50);
+//		Line_1A_WTN5(0xF2); //连续播放
+//		HAL_Delay(50);
+//		Line_1A_WTN5(0x00); //播放第零语音
+//		HAL_Delay(50);
+//	}
+	uint8_t temp[10];
+	//EE 90 01 00 02 00 FF FC FF FF
+	temp[0] = 0xEE;	//帧头
+	temp[1] = 0x90;	//命令类型(UPDATE_CONTROL)
+	temp[2] = 0x01;
+	temp[3] = 0x00;
+	temp[4] = 0x02;
+	temp[5] = 0x00;
+	temp[6] = 0xFF;	//帧尾
+	temp[7] = 0xFC;
+	temp[8] = 0xFF;
+	temp[9] = 0xFF;
+	HAL_UART_Transmit(&huart2, temp, 10, SendTime);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_SET);
 	bebe = 1;
 }
 
-void alarm_off(void) //播放声音
+void alarm_off(void) //暂停播放声音
 {
-	uint8_t i;
-	for (i = 0; i < 5; i++) {
-		Line_1A_WTN5(0xFE); //停止
-		HAL_Delay(10);
-	}
+//	uint8_t i;
+//	for (i = 0; i < 5; i++) {
+//		Line_1A_WTN5(0xFE); //停止
+//		HAL_Delay(10);
+//	}
+	uint8_t temp[7];
+	temp[0] = 0xEE;	//帧头
+	temp[1] = 0x90;	//命令类型(UPDATE_CONTROL)
+	temp[2] = 0x00;
+	temp[3] = 0xFF;	//帧尾
+	temp[4] = 0xFC;
+	temp[5] = 0xFF;
+	temp[6] = 0xFF;
+	HAL_UART_Transmit(&huart2, temp, 7, SendTime);
+	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_14, GPIO_PIN_RESET);
 	bebe = 0;
 
 }
@@ -2585,7 +3681,7 @@ void getCurrentPage(void) {
 	temp[4] = 0xFC;
 	temp[5] = 0xFF;
 	temp[6] = 0xFF;
-	HAL_UART_Transmit(&huart2, temp, 7, 0xFFFF);
+	HAL_UART_Transmit(&huart2, temp, 7, SendTime);
 }
 
 void checkLic(void) {
@@ -2608,9 +3704,13 @@ void checkLic(void) {
 							date_1302[5] * 10 + date_1302[4],
 							date_1302[3] * 10 + date_1302[2],
 							date_1302[1] * 10 + date_1302[0])) {
-		HAL_UART_Transmit(&huart2, licPassedCMD, 11, 0xFFFF);
+		licFailedFlag = 0;
+		licPassedCMD[4] = currentPage;
+		HAL_UART_Transmit(&huart2, licPassedCMD, 11, SendTime);
 	} else {
-		HAL_UART_Transmit(&huart2, licFailedCMD, 19, 0xFFFF);
+		licFailedFlag = 1;
+		licPassedCMD[4] = currentPage;
+		HAL_UART_Transmit(&huart2, licFailedCMD, 19, SendTime);
 	}
 }
 
@@ -2618,7 +3718,7 @@ void setBluetooth(void) {
 	/* 查询蓝牙MAC地址 */
 	uint8_t getBluetoothMAC[10] = { 'A', 'T', '+', 'A', 'D', 'D', 'R', '?',
 			'\r', '\n' };
-	HAL_UART_Transmit(&huart1, getBluetoothMAC, 10, 0xFFFF);
+	HAL_UART_Transmit(&huart1, getBluetoothMAC, 10, SendTime);
 }
 
 void bsp_Delay_Nus(uint16_t time) {
@@ -2637,7 +3737,7 @@ void bsp_Delay_Nus(uint16_t time) {
  * @param  None
  * @retval None
  */
-void _Error_Handler(char * file, int line) {
+void _Error_Handler(char *file, int line) {
 	/* USER CODE BEGIN Error_Handler_Debug */
 	/* User can add his own implementation to report the HAL error return state */
 	while (1) {

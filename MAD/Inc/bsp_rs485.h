@@ -4,13 +4,12 @@
 /* 包含头文件 ----------------------------------------------------------------*/
 #include "stm32f1xx_hal.h"
 #include "usart.h"
-
-extern uint8_t RS485_RX_BUF[];  	//接收缓冲
+//485接收缓冲
+extern uint8_t RS485_RX_BUF[];
 
 //模式控制
-#define RS485_TX_ON()   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET);__HAL_UART_DISABLE_IT(&huart3, UART_IT_RXNE)
-#define RS485_TX_OFF()  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE)
-
+#define RS485_TX_ON()   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_SET);__HAL_UART_DISABLE_IT(&huart3, UART_IT_RXNE)
+#define RS485_TX_OFF()  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_15, GPIO_PIN_RESET);__HAL_UART_ENABLE_IT(&huart3, UART_IT_RXNE)
 
 /********************************************************************
 *	功能：485初始化
@@ -30,19 +29,3 @@ unsigned short CRC16(unsigned char *puchMsg, unsigned short usDataLen) ;
 extern uint8_t RS485_RX_BUF[];  	//接收缓冲
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -17,10 +17,10 @@
 #include "bsp_usart_lcd.h"
 #include "bsp_spi_flash.h"
 #include "bsp_ds1302.h"
-
+extern uint8_t Ver[];
 extern uint32_t calcDays(uint8_t y1, uint8_t m1, uint8_t d1, uint8_t y2,
 		uint8_t m2, uint8_t d2);
-
+extern uint16_t SendTime;
 extern uint8_t currentPage;
 extern UART_HandleTypeDef huart2;
 extern uint8_t currentPage;
@@ -32,7 +32,8 @@ extern uint8_t inputPassword[];
 extern uint8_t currentCHN;
 extern uint8_t getUIFlag;
 extern uint8_t volumePicCMD[];
-extern uint8_t muteFlag;
+extern uint8_t muteFlag[3];
+extern uint8_t ledFlag[3];
 extern uint8_t alarmFlag;
 extern uint8_t testFlag;
 CTRL_MSG updateUICMD;
@@ -41,8 +42,8 @@ CTRL_MSG updateUICMD;
 uint8_t setTextGreen[2] = { 0x04, 0x00 };
 uint8_t setTextRed[2] = { 0xF8, 0x00 };
 
-/* 中英文名称 两位长度 + 字符编码 */
-uint8_t enName[21][10] = {
+/* 中英文名称 */
+uint8_t engName[23][13] = {
 //未使用 - Unused
 		{ 0x00, 0x06, 0x55, 0x6E, 0x75, 0x73, 0x65, 0x64 },
 		//医疗空气 - Med Air
@@ -71,21 +72,26 @@ uint8_t enName[21][10] = {
 		{ 0x00, 0x06, 0x4F, 0x32, 0x2F, 0x43, 0x4F, 0x32 },
 		//氦气/氧气 - He/O2
 		{ 0x00, 0x05, 0x48, 0x65, 0x2F, 0x4F, 0x32 },
-		//麻醉废气 -TODO
-		{ 0x00, 0x01, 0x20 },
-		//呼吸废气 -TODO
-		{ 0x00, 0x01, 0x20 },
+		//麻醉废气 -AGSS
+		{ 0x00, 0x04, 0x41, 0x47, 0x53, 0x53 },
+		//呼吸废气 -AGSS
+		{ 0x00, 0x04, 0x41, 0x47, 0x53, 0x53 },
 		//输入压力 - Pin
 		{ 0x00, 0x03, 0x50, 0x69, 0x6E },
 		//输出压力 - Pout
 		{ 0x00, 0x04, 0x50, 0x6F, 0x75, 0x74 },
-		//通道1 - CHN1
-		{ 0x00, 0x04, 0x43, 0x48, 0x4E, 0x31 },
-		//通道2 - CHN2
-		{ 0x00, 0x04, 0x43, 0x48, 0x4E, 0x32 },
-		//通道3 - CHN3
-		{ 0x00, 0x04, 0x43, 0x48, 0x4E, 0x33 }, };
-uint8_t cnName[21][15] = {
+		//通道1 - Access 1
+		{ 0x00, 0x08, 0x41, 0x63, 0x63, 0x65, 0x73, 0x73, 0x20, 0x31 },
+		//通道2 - Access 2
+		{ 0x00, 0x08, 0x41, 0x63, 0x63, 0x65, 0x73, 0x73, 0x20, 0x32 },
+		//通道3 - Access 3
+		{ 0x00, 0x08, 0x41, 0x63, 0x63, 0x65, 0x73, 0x73, 0x20, 0x33 },
+		//氧气流量 - OXYGEN FLOW
+		{ 0x00, 0x0B, 0x4F, 0x58, 0x59, 0x47, 0x45, 0x4E, 0x20, 0x46, 0x4C,
+				0x4F, 0x57 },
+		//氩气 - Argon
+		{ 0x00, 0x05, 0x41, 0x72, 0x67, 0x6F, 0x6E }, };
+uint8_t chnName[23][14] = {
 //未使用
 		{ 0x00, 0x06, 0xCE, 0xB4, 0xCA, 0xB9, 0xD3, 0xC3 },
 		//医疗空气
@@ -129,8 +135,62 @@ uint8_t cnName[21][15] = {
 		//通道2
 		{ 0x00, 0x05, 0xCD, 0xA8, 0xB5, 0xC0, 0x32 },
 		//通道3
-		{ 0x00, 0x05, 0xCD, 0xA8, 0xB5, 0xC0, 0x33 }, };
+		{ 0x00, 0x05, 0xCD, 0xA8, 0xB5, 0xC0, 0x33 },
+		//氧气流量
+		{ 0x00, 0x08, 0xD1, 0xF5, 0xC6, 0xF8, 0xC1, 0xF7, 0xC1, 0xBF },
+		//氩气
+		{ 0x00, 0x04, 0xEB, 0xB2, 0xC6, 0xF8 }, };
+uint8_t colorName[23][1] = {
+//未使用 - Unused
+		{ 0 },
+		//医疗空气 - Med Air
+		{ 0 },
+		//器械空气 - Air 800
+		{ 0 },
+		//牙科空气 - Dent Air
+		{ 0 },
+		//混合气体 - Syn Gas
+		{ 0 },
+		//医用真空 - Vac
+		{ 1 },
+		//牙科真空 - Dent Vac
+		{ 1 },
+		//医用氧气 - O2
+		{ 0 },
+		//氮气 - N2
+		{ 0 },
+		//二氧化碳 -CO2
+		{ 2 },
+		//氧化亚氮 - N2O
+		{ 3 },
+		//氧/氧化亚氮 - O2/N2O
+		{ 4 },
+		//氧/二氧化碳 - O2/CO2
+		{ 5 },
+		//氦气/氧气 - He/O2
+		{ 6 },
+		//麻醉废气 - AGSS
+		{ 7 },
+		//呼吸废气 - AGSS
+		{ 7 },
+		//输入压力 - Pin
+		{ 0 },
+		//输出压力 - Pout
+		{ 0 },
+		//通道1 - Access 1
+		{ 0 },
+		//通道2 - Access 2
+		{ 0 },
+		//通道3 - Access 3
+		{ 0 },
+		//氧气流量 - OXYGEN FLOW
+		{ 0 },
+		//氩气 - Argon
+		{ 0 }, };
 
+/* 0~1MPa;0~1.6MPa;0~2.5MPa;-100~300kPa;0~200L/min;0~400L/min;0~600L/min;0~800L/min; */
+float rangeUpperLimit[8] = { 1, 1.6, 2.5, -100, 200, 400, 600, 800 };
+float rangeLowerLimit[8] = { 0, 0, 0, 300, 0, 0, 0, 0 };
 /* 时钟变量 DS1302 */
 //extern volatile char time_tab[];
 extern char date_1302[];
@@ -142,7 +202,7 @@ void factorySetting(uint8_t permisson);
 extern void loadMainPage(void);
 extern void FloatToStr5(float data, uint8_t *buf, int size);
 extern float StrToFloat(uint8_t *buf);
-extern void Line_1A_WTN5(unsigned char SB_DATA);
+//extern void Line_1A_WTN5(unsigned char SB_DATA);
 
 /*!
  *  \brief  消息处理流程，此处一般不需要更改
@@ -239,14 +299,8 @@ void NotifyScreen(uint16_t screen_id) {
 		currentPage = screen_id;
 		if (currentPage == PAGE_START) {
 			if (timeStamp == 999) {
-				uint8_t temp[11];
-				/* 播放开机音频 */
-				Line_1A_WTN5(0xEF - 5); //音量
-				HAL_Delay(50);
-				Line_1A_WTN5(0xF3); //断续播放
-				HAL_Delay(50);
-				Line_1A_WTN5(0x01); //播放第零语音
-				HAL_Delay(50);
+				uint8_t temp[14];
+
 				//启动开机动画
 				//EE B1 20 00 00 00 01 FF FC FF FF
 				temp[0] = 0xEE; //帧头
@@ -260,8 +314,31 @@ void NotifyScreen(uint16_t screen_id) {
 				temp[8] = 0xFC;
 				temp[9] = 0xFF;
 				temp[10] = 0xFF;
-				HAL_UART_Transmit(&huart2, temp, 11, 0xFFFF);
-				//记录定时器时间，8s开机
+				HAL_UART_Transmit(&huart2, temp, 11, SendTime);
+
+				/* 播放开机音频 */
+//				Line_1A_WTN5(0xEF - 5); //音量
+//				HAL_Delay(50);
+//				Line_1A_WTN5(0xF3); //断续播放
+//				HAL_Delay(50);
+//				Line_1A_WTN5(0x01); //播放第零语音
+//				HAL_Delay(50);
+				HAL_Delay(1000);
+				//播放开机音频 - 7寸屏自带喇叭
+				//EE 90 01 00 01 00 FF FC FF FF
+				temp[0] = 0xEE; //帧头
+				temp[1] = 0x90;	//命令类型(UPDATE_CONTROL)
+				temp[2] = 0x01;
+				temp[3] = 0x00;
+				temp[4] = 0x01;
+				temp[5] = 0x01;
+				temp[6] = 0xFF;	//帧尾
+				temp[7] = 0xFC;
+				temp[8] = 0xFF;
+				temp[9] = 0xFF;
+				HAL_UART_Transmit(&huart2, temp, 10, SendTime);
+
+				//记录定时器时间，12s开机
 				timeStamp = currentTime;
 			}
 		}
@@ -272,7 +349,7 @@ void NotifyScreen(uint16_t screen_id) {
 			//EE B1 10 00 02 00 04 20 FF FC FF FF
 			uint8_t temp0[12] = { 0xEE, 0xB1, 0x10, 0x00, 0x02, 0x00, 0x04,
 					0x20, 0xFF, 0xFC, 0xFF, 0xFF };
-			HAL_UART_Transmit(&huart2, temp0, 12, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp0, 12, SendTime);
 			//更新初始显示密码
 			//EE B1 10 00 02 00 01 78 78 78 78 FF FC FF FF
 			temp[0] = 0xEE; //帧头
@@ -290,22 +367,61 @@ void NotifyScreen(uint16_t screen_id) {
 			temp[12] = 0xFC;
 			temp[13] = 0xFF;
 			temp[14] = 0xFF;
-			HAL_UART_Transmit(&huart2, temp, 15, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp, 15, SendTime);
 			for (i = 0; i < 4; i++) {
 				inputPassword[i] = 0x78;
 			}
+
+			//EE 86 01 01 F4 00 DC 00 00 0C FF FC FF FF
+			//自动弹出密码输入小键盘
+			temp[0] = 0xEE; //帧头
+			temp[1] = 0x86;	//命令类型(UPDATE_CONTROL)
+			temp[2] = 0x01;
+			temp[3] = 0x01;
+			temp[4] = 0xF4;
+			temp[5] = 0x00;
+			temp[6] = 0xDC;
+			temp[7] = 0x00;
+			temp[8] = 0x00;
+			temp[9] = 0x0C;
+			temp[10] = 0xFF; //帧尾
+			temp[11] = 0xFC;
+			temp[12] = 0xFF;
+			temp[13] = 0xFF;
+			HAL_UART_Transmit(&huart2, temp, 14, SendTime);
+
+			//EE B1 02 00 02 00 01 01 FF FC FF FF
+			//自动设置密码框焦点
+			temp[0] = 0xEE; //帧头
+			temp[1] = 0xB1;	//命令类型(UPDATE_CONTROL)
+			temp[2] = 0x02;
+			temp[3] = 0x00;
+			temp[4] = 0x02;
+			temp[5] = 0x00;
+			temp[6] = 0x01;
+			temp[7] = 0x01;
+			temp[8] = 0xFF; //帧尾
+			temp[9] = 0xFC;
+			temp[10] = 0xFF;
+			temp[11] = 0xFF;
+			HAL_UART_Transmit(&huart2, temp, 12, SendTime);
 		}
 
 		if (currentPage == PAGE_SET1) {
+			/* 显示版本号 */
+			Ver[5] = currentPage;
+			HAL_UART_Transmit(&huart2, Ver, 23, SendTime);
 			//获取 set1 当前通道号
 			//EE B1 11 00 02 00 01 FF FC FF FF
 			uint8_t temp4[11] = { 0xEE, 0xB1, 0x11, 0x00, 0x03, 0x00, 0x01,
 					0xFF, 0xFC, 0xFF, 0xFF };
 			/* 获取通道号以更新界面 */
-			HAL_UART_Transmit(&huart2, temp4, 11, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp4, 11, SendTime);
 		}
 
 		if (currentPage == PAGE_SET2) {
+			Ver[5] = currentPage;
+			HAL_UART_Transmit(&huart2, Ver, 23, SendTime);
 			uint8_t temp[100];
 			uint8_t i = 0;
 			//EE B1 12 00 04
@@ -386,7 +502,7 @@ void NotifyScreen(uint16_t screen_id) {
 			temp[i + 35] = 0xFC;
 			temp[i + 36] = 0xFF;
 			temp[i + 37] = 0xFF;
-			HAL_UART_Transmit(&huart2, temp, i + 38, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp, i + 38, SendTime);
 			//加载波特率
 			//EE B1 10 00 04 00 02 00 FF FC FF FF
 			temp[3] = 0x10;
@@ -399,15 +515,15 @@ void NotifyScreen(uint16_t screen_id) {
 			temp[10] = 0xFC;
 			temp[11] = 0xFF;
 			temp[12] = 0xFF;
-			HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp, 13, SendTime);
 			//加载模式
 			temp[7] = 0x04;
 			temp[8] = saveData[0].modeIndex;
-			HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp, 13, SendTime);
 			//加载音量
 			temp[7] = 0x05;
 			temp[8] = (uint8_t) (saveData[0].volume / 10);
-			HAL_UART_Transmit(&huart2, temp, 13, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp, 13, SendTime);
 		}
 
 		if (currentPage == PAGE_BLUETOOTH) {
@@ -418,7 +534,7 @@ void NotifyScreen(uint16_t screen_id) {
 			uint8_t temp4[11] = { 0xEE, 0xB1, 0x11, 0x00, 0x03, 0x00, 0x01,
 					0xFF, 0xFC, 0xFF, 0xFF };
 			/* 获取通道号以更新界面 */
-			HAL_UART_Transmit(&huart2, temp4, 11, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp4, 11, SendTime);
 		}
 	}
 }
@@ -502,25 +618,28 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		switch (j) {
 		case 0:
 			/* 提示密码错误 */
-			HAL_UART_Transmit(&huart2, temp0, 19, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp0, 19, SendTime);
 			break;
 		case 1:
 			/* 清除提示密码错误 */
-			HAL_UART_Transmit(&huart2, temp5, 12, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp5, 12, SendTime);
 			/* 进入set1 */
-			HAL_UART_Transmit(&huart2, temp1, 9, 0xFFFF);
-			lastPage = currentPage;
+			HAL_UART_Transmit(&huart2, temp1, 9, SendTime);
+			//lastPage = currentPage;
 			currentPage = PAGE_SET1;
 			/* 获取通道号以更新界面 */
-			HAL_UART_Transmit(&huart2, temp4, 11, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp4, 11, SendTime);
 			break;
 		case 2:
 			/* 清除提示密码错误 */
-			HAL_UART_Transmit(&huart2, temp5, 12, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp5, 12, SendTime);
 			/* 进入set3 */
-			HAL_UART_Transmit(&huart2, temp2, 9, 0xFFFF);
-			lastPage = currentPage;
+			HAL_UART_Transmit(&huart2, temp2, 9, SendTime);
+//			lastPage = currentPage;
 			currentPage = PAGE_SET3;
+			/* 显示版本号 */
+			Ver[5] = currentPage;
+			HAL_UART_Transmit(&huart2, Ver, 23, SendTime);
 
 			get_date();
 			days = saveData[0].omeDays
@@ -586,16 +705,18 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			temp[j++] = 0xFC;
 			temp[j++] = 0xFF;
 			temp[j++] = 0xFF;
-			HAL_UART_Transmit(&huart2, temp, j, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp, j, SendTime);
 			break;
 		case 3:
 			/* 清除提示密码错误 */
-			HAL_UART_Transmit(&huart2, temp5, 12, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp5, 12, SendTime);
 			/* 进入set4 */
-			HAL_UART_Transmit(&huart2, temp3, 9, 0xFFFF);
-			lastPage = currentPage;
+			HAL_UART_Transmit(&huart2, temp3, 9, SendTime);
+			//lastPage = currentPage;
 			currentPage = PAGE_SET4;
-
+			/* 显示版本号 */
+			Ver[5] = currentPage;
+			HAL_UART_Transmit(&huart2, Ver, 23, SendTime);
 			get_date();
 
 			days = saveData[0].rootDays
@@ -660,7 +781,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			temp[j++] = 0xFC;
 			temp[j++] = 0xFF;
 			temp[j++] = 0xFF;
-			HAL_UART_Transmit(&huart2, temp, j, 0xFFFF);
+			HAL_UART_Transmit(&huart2, temp, j, SendTime);
 			break;
 		}
 	}/* END 密码界面确认按钮 */
@@ -673,58 +794,54 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 
 	/* set1取消按钮 */
 	if (currentPage == PAGE_SET1 && control_id == 9) {
+		//跳转至load屏幕
+		//EE B1 00 00 01 FF FC FF FF
+		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
+				0xFF };
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 复原参数 */
 		eepromReadSetting();
-		//恢复至对应主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
-				0xFF };
-		temp5[4] = lastPage;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		currentPage = lastPage;
-		lastPage = PAGE_SET1;
+		/* 根据设置加载主屏幕 */
+		loadMainPage();
 	}/* END set1取消按钮 */
 
 	/* set2取消按钮 */
 	if (currentPage == PAGE_SET2 && control_id == 9) {
+		//跳转至load屏幕
+		//EE B1 00 00 01 FF FC FF FF
+		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
+				0xFF };
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 复原参数 */
 		eepromReadSetting();
-		//恢复至对应主屏幕
-		//EE B1 00 00 01 FF FC FF FF
-		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
-				0xFF };
-		temp5[4] = lastPage;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		currentPage = lastPage;
-		lastPage = PAGE_SET2;
+		/* 根据设置加载主屏幕 */
+		loadMainPage();
 	}/* END set2取消按钮 */
 
 	/* set3取消按钮 */
 	if (currentPage == PAGE_SET3 && control_id == 9) {
-		//恢复至对应主屏幕
+		//跳转至load屏幕
 		//EE B1 00 00 01 FF FC FF FF
-		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
+		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		temp5[4] = lastPage;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		currentPage = lastPage;
-		lastPage = PAGE_SET3;
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 复原参数 */
 		eepromReadSetting();
+		/* 根据设置加载主屏幕 */
+		loadMainPage();
 	}/* END set3取消按钮 */
 
 	/* set4取消按钮 */
 	if (currentPage == PAGE_SET4 && control_id == 9) {
-		//恢复至对应主屏幕
+		//跳转至load屏幕
 		//EE B1 00 00 01 FF FC FF FF
-		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
+		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		temp5[4] = lastPage;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
-		currentPage = lastPage;
-		lastPage = PAGE_SET4;
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 复原参数 */
 		eepromReadSetting();
+		/* 根据设置加载主屏幕 */
+		loadMainPage();
 	}/* END set4取消按钮 */
 
 	/* Bluetooth取消按钮 */
@@ -734,7 +851,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x01, 0xFF, 0xFC, 0xFF,
 				0xFF };
 		temp5[4] = lastPage;
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		currentPage = lastPage;
 		lastPage = PAGE_BLUETOOTH;
 	}/* END Bluetooth取消按钮 */
@@ -746,7 +863,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		//EE B1 00 00 01 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 保存参数到 eeprom */
 		eepromWriteSetting();
 		eepromReadSetting();
@@ -759,7 +876,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		//EE B1 00 00 01 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 保存参数到 eeprom */
 		eepromWriteSetting();
 		eepromReadSetting();
@@ -772,7 +889,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		//EE B1 00 00 01 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 保存参数到 eeprom */
 		eepromWriteSetting();
 		eepromReadSetting();
@@ -783,9 +900,17 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 	if (control_id == 22) {
 		//修改音量图标
 		volumePicCMD[4] = currentPage;
-		if (muteFlag == 0) {
+		if (muteFlag[0] == 0 && (ledFlag[0] != 0 || ledFlag[0] != 3)) {
 			volumePicCMD[7] = 0 + alarmFlag;
-			muteFlag = 1;
+			muteFlag[0] = 1;
+		}
+		if (muteFlag[1] == 0 && (ledFlag[1] != 0 || ledFlag[1] != 3)) {
+			volumePicCMD[7] = 0 + alarmFlag;
+			muteFlag[1] = 1;
+		}
+		if (muteFlag[2] == 0 && (ledFlag[2] != 0 || ledFlag[2] != 3)) {
+			volumePicCMD[7] = 0 + alarmFlag;
+			muteFlag[2] = 1;
 		} else {
 			volumePicCMD[7] = (uint8_t) (saveData[0].volume / 10);
 			if (volumePicCMD[7] <= 4) {
@@ -795,10 +920,21 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			} else if (volumePicCMD[7] > 7) {
 				volumePicCMD[7] = 3 + alarmFlag;
 			}
-			muteFlag = 0;
+			if (muteFlag[0] == 1 && (ledFlag[0] != 0 || ledFlag[0] != 3)) {
+				volumePicCMD[7] = 0 + alarmFlag;
+				muteFlag[0] = 0;
+			}
+			if (muteFlag[1] == 1 && (ledFlag[1] != 0 || ledFlag[1] != 3)) {
+				volumePicCMD[7] = 0 + alarmFlag;
+				muteFlag[1] = 0;
+			}
+			if (muteFlag[2] == 1 && (ledFlag[2] != 0 || ledFlag[2] != 3)) {
+				volumePicCMD[7] = 0 + alarmFlag;
+				muteFlag[2] = 0;
+			}
 		}
 		//修改音量图标
-		HAL_UART_Transmit(&huart2, volumePicCMD, 12, 0xFFFF);
+		HAL_UART_Transmit(&huart2, volumePicCMD, 12, SendTime);
 	}/* END 静音按钮 */
 	/* 测试按钮 */
 	if (control_id == 24) {
@@ -814,6 +950,20 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
  *  \param str 文本控件内容
  */
 void NotifyText(uint16_t screen_id, uint16_t control_id, uint8_t *str) {
+	float templimit = 0;
+	/* 上下限 && 压力修正系数 */
+	//EE B1 12 00 03
+	//00 04 00 04 31 2E 31 31
+	//00 05 00 04 31 2E 31 31
+	//00 06 00 04 31 2E 31 31
+	//00 07 00 04 31 2E 31 31
+	//FF FC FF FF
+	uint8_t temp2[45] = { 0xEE, 0xB1, 0x12, 0x00, 0x03, 0x00, 0x04, 0x00, 0x05,
+			0x2D, 0x31, 0x2E, 0x31, 0x31, 0x00, 0x05, 0x00, 0x05, 0x2D, 0x31,
+			0x2E, 0x31, 0x31, 0x00, 0x06, 0x00, 0x05, 0x2D, 0x31, 0x2E, 0x31,
+			0x31, 0x00, 0x07, 0x00, 0x05, 0x2D, 0x31, 0x2E, 0x31, 0x31, 0xFF,
+			0xFC, 0xFF, 0xFF };
+
 	getUIFlag = 0;
 	if (currentPage == PAGE_PASSWORD && control_id == 1) {
 		uint8_t i, j;
@@ -831,10 +981,139 @@ void NotifyText(uint16_t screen_id, uint16_t control_id, uint8_t *str) {
 	/* 修改上限 */
 	if (screen_id == PAGE_SET1 && control_id == 4) {
 		saveData[currentCHN].upper_limit = StrToFloat(str);
+		/* 上下限设置反了，自动对调 */
+		if (saveData[currentCHN].rangeIndex == 3) {
+			if (saveData[currentCHN].upper_limit
+					> saveData[currentCHN].lower_limit) {
+				templimit = saveData[currentCHN].upper_limit;
+				saveData[currentCHN].upper_limit =
+						saveData[currentCHN].lower_limit;
+				saveData[currentCHN].lower_limit = templimit;
+				/* 根据通道号修改其他设置项 */
+				if (screen_id == PAGE_SET1) {
+					/* 上下限 && 压力修正系数 */
+					FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+					FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18],
+							5);
+					FloatToStr5((float) saveData[currentCHN].zero, &temp2[27],
+							5);
+					FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+					HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+				}
+			}
+		} else {
+			if (saveData[currentCHN].upper_limit
+					< saveData[currentCHN].lower_limit) {
+				templimit = saveData[currentCHN].upper_limit;
+				saveData[currentCHN].upper_limit =
+						saveData[currentCHN].lower_limit;
+				saveData[currentCHN].lower_limit = templimit;
+				/* 根据通道号修改其他设置项 */
+				if (screen_id == PAGE_SET1) {
+					/* 上下限 && 压力修正系数 */
+					FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+					FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18],
+							5);
+					FloatToStr5((float) saveData[currentCHN].zero, &temp2[27],
+							5);
+					FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+					HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+				}
+			}
+		}
+		/* 上限超了设定默认值 */
+		if (saveData[currentCHN].upper_limit
+				> rangeUpperLimit[saveData[currentCHN].rangeIndex]) {
+			if (saveData[currentCHN].rangeIndex != 3) {
+				saveData[currentCHN].upper_limit =
+						rangeUpperLimit[saveData[currentCHN].rangeIndex];
+				/* 根据通道号修改其他设置项 */
+				if (screen_id == PAGE_SET1) {
+					/* 上下限 && 压力修正系数 */
+					FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+					FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18],
+							5);
+					FloatToStr5((float) saveData[currentCHN].zero, &temp2[27],
+							5);
+					FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+					HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+				}
+			}
+		}
+		if (saveData[currentCHN].upper_limit
+				< rangeUpperLimit[saveData[currentCHN].rangeIndex]) {
+			if (saveData[currentCHN].rangeIndex == 3) {
+				saveData[currentCHN].upper_limit =
+						rangeUpperLimit[saveData[currentCHN].rangeIndex];
+				/* 根据通道号修改其他设置项 */
+				if (screen_id == PAGE_SET1) {
+					/* 上下限 && 压力修正系数 */
+					FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+					FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18],
+							5);
+					FloatToStr5((float) saveData[currentCHN].zero, &temp2[27],
+							5);
+					FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+					HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+				}
+			}
+		}
 	}
 	/* 修改下限 */
 	if (screen_id == PAGE_SET1 && control_id == 5) {
 		saveData[currentCHN].lower_limit = StrToFloat(str);
+		if (saveData[currentCHN].upper_limit
+				< saveData[currentCHN].lower_limit) {
+			templimit = saveData[currentCHN].upper_limit;
+			saveData[currentCHN].upper_limit = saveData[currentCHN].lower_limit;
+			saveData[currentCHN].lower_limit = templimit;
+			/* 根据通道号修改其他设置项 */
+			if (screen_id == PAGE_SET1) {
+				/* 上下限 && 压力修正系数 */
+				FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+				FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18], 5);
+				FloatToStr5((float) saveData[currentCHN].zero, &temp2[27], 5);
+				FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+				HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+			}
+		}
+		/* 下限超了设定默认值 */
+		if (saveData[currentCHN].lower_limit
+				< rangeLowerLimit[saveData[currentCHN].rangeIndex]) {
+			if (saveData[currentCHN].rangeIndex != 3) {
+				saveData[currentCHN].lower_limit =
+						rangeLowerLimit[saveData[currentCHN].rangeIndex];
+				/* 根据通道号修改其他设置项 */
+				if (screen_id == PAGE_SET1) {
+					/* 上下限 && 压力修正系数 */
+					FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+					FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18],
+							5);
+					FloatToStr5((float) saveData[currentCHN].zero, &temp2[27],
+							5);
+					FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+					HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+				}
+			}
+		}
+		if (saveData[currentCHN].lower_limit
+				> rangeLowerLimit[saveData[currentCHN].rangeIndex]) {
+			if (saveData[currentCHN].rangeIndex == 3) {
+				saveData[currentCHN].lower_limit =
+						rangeLowerLimit[saveData[currentCHN].rangeIndex];
+				/* 根据通道号修改其他设置项 */
+				if (screen_id == PAGE_SET1) {
+					/* 上下限 && 压力修正系数 */
+					FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+					FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18],
+							5);
+					FloatToStr5((float) saveData[currentCHN].zero, &temp2[27],
+							5);
+					FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+					HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+				}
+			}
+		}
 	}
 	/* 修改零点 */
 	if (screen_id == PAGE_SET1 && control_id == 6) {
@@ -989,12 +1268,13 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 		uint8_t state) {
 	getUIFlag = 0;
 	/* set2 恢复出厂设置 - 确认按钮 */
-	if (currentPage == PAGE_SET2 && control_id == 14 && state == 0) {
+	if (currentPage == PAGE_SET2 && control_id == 14 && item == 1
+			&& state == 1) {
 		//跳转至load屏幕
 		//EE B1 00 00 07 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 
 		/* 保存参数到 eeprom */
 		factorySetting(2);
@@ -1003,12 +1283,13 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 		loadMainPage();
 	}/* END set2 恢复出厂设置 - 确认按钮 */
 	/* set3 恢复出厂设置 - 确认按钮 */
-	if (currentPage == PAGE_SET3 && control_id == 14 && state == 0) {
+	if (currentPage == PAGE_SET3 && control_id == 14 && item == 1
+			&& state == 1) {
 		//跳转至load屏幕
 		//EE B1 00 00 07 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 保存参数到 eeprom */
 		factorySetting(1);
 		eepromWriteSetting();
@@ -1017,12 +1298,13 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 	}/* END set3 恢复出厂设置 - 确认按钮 */
 
 	/* set4 恢复出厂设置 - 确认按钮 */
-	if (currentPage == PAGE_SET4 && control_id == 14 && state == 0) {
+	if (currentPage == PAGE_SET4 && control_id == 14 && item == 1
+			&& state == 1) {
 		//跳转至load屏幕
 		//EE B1 00 00 07 FF FC FF FF
 		uint8_t temp5[9] = { 0xEE, 0xB1, 0x00, 0x00, 0x07, 0xFF, 0xFC, 0xFF,
 				0xFF };
-		HAL_UART_Transmit(&huart2, temp5, 9, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp5, 9, SendTime);
 		/* 保存参数到 eeprom */
 		factorySetting(0);
 		eepromWriteSetting();
@@ -1060,17 +1342,17 @@ void NotifySelector(uint16_t screen_id, uint16_t control_id, uint8_t item) {
 		/* 名称 */
 		temp1[6] = 2;
 		temp1[7] = saveData[item].nameIndex;
-		HAL_UART_Transmit(&huart2, temp1, 12, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp1, 12, SendTime);
 		/* 量程 */
 		temp1[6] = 3;
 		temp1[7] = saveData[item].rangeIndex;
-		HAL_UART_Transmit(&huart2, temp1, 12, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp1, 12, SendTime);
 		/* 上下限 && 压力修正系数 */
 		FloatToStr5(saveData[item].upper_limit, &temp2[9], 5);
 		FloatToStr5(saveData[item].lower_limit, &temp2[18], 5);
 		FloatToStr5((float) saveData[item].zero, &temp2[27], 5);
 		FloatToStr5((float) saveData[item].K, &temp2[36], 5);
-		HAL_UART_Transmit(&huart2, temp2, 45, 0xFFFF);
+		HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
 		currentCHN = item;
 	}
 	/* 修改设置项 */
@@ -1081,6 +1363,48 @@ void NotifySelector(uint16_t screen_id, uint16_t control_id, uint8_t item) {
 	/* 修改量程 */
 	if (screen_id == PAGE_SET1 && control_id == 3) {
 		saveData[currentCHN].rangeIndex = item;
+		/* 根据量程复原上下限 */
+		/* 上下限 && 压力修正系数 */
+		switch (item) {
+		case 0:
+			saveData[currentCHN].upper_limit = 1;
+			saveData[currentCHN].lower_limit = 0;
+			break;
+		case 1:
+			saveData[currentCHN].upper_limit = 1.6;
+			saveData[currentCHN].lower_limit = 0;
+			break;
+		case 2:
+			saveData[currentCHN].upper_limit = 2.5;
+			saveData[currentCHN].lower_limit = 0;
+			break;
+		case 3:
+			saveData[currentCHN].upper_limit = -100;
+			saveData[currentCHN].lower_limit = 300;
+			break;
+		case 4:
+			saveData[currentCHN].upper_limit = 200;
+			saveData[currentCHN].lower_limit = 0;
+			break;
+		case 5:
+			saveData[currentCHN].upper_limit = 400;
+			saveData[currentCHN].lower_limit = 0;
+			break;
+		case 6:
+			saveData[currentCHN].upper_limit = 600;
+			saveData[currentCHN].lower_limit = 0;
+			break;
+		case 7:
+			saveData[currentCHN].upper_limit = 800;
+			saveData[currentCHN].lower_limit = 0;
+			break;
+		}
+		FloatToStr5(saveData[currentCHN].upper_limit, &temp2[9], 5);
+		FloatToStr5(saveData[currentCHN].lower_limit, &temp2[18], 5);
+		FloatToStr5((float) saveData[currentCHN].zero, &temp2[27], 5);
+		FloatToStr5((float) saveData[currentCHN].K, &temp2[36], 5);
+		HAL_UART_Transmit(&huart2, temp2, 45, SendTime);
+
 	}
 	/* 修改波特率 */
 	if (screen_id == PAGE_SET2 && control_id == 2) {
